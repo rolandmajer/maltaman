@@ -2,6 +2,9 @@
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
+# NOTE: secrets added in the Fly dashboard are only STAGED until a "Deploy Secrets" run or the
+# next code deployment applies them. If a secrets-only deploy keeps failing, merging any code
+# change (like the commit that added this note) applies the staged secrets too.
 
 app = 'maltaman'
 primary_region = 'fra'
