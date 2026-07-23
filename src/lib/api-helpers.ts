@@ -18,6 +18,13 @@ export async function requireSession() {
   return session.user;
 }
 
+/** Resolves the current session's user and verifies the ADMIN role (403 otherwise). */
+export async function requireAdmin() {
+  const user = await requireSession();
+  if (user.role !== "ADMIN") throw new ApiError(403, "Túto akciu môže vykonať len administrátor");
+  return user;
+}
+
 /** Loads an inspection and verifies it belongs to the caller's organisation (multi-tenant isolation). */
 export async function requireInspectionAccess(inspectionId: string, organisationId: string) {
   const inspection = await db.inspection.findUnique({ where: { id: inspectionId } });
