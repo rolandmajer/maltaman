@@ -11,9 +11,14 @@ primary_region = "fra"
 [env]
   PORT = "3000"
   NODE_ENV = "production"
-  # SQLite DB file and photo storage both live on the mounted volume below so they
-  # survive deploys/restarts. Not secret (just a path) — safe to keep in plain env.
+  # The SQLite DB file lives on the mounted volume below so it survives deploys/restarts.
+  # Not secret (just a path) — safe to keep in plain env.
   DATABASE_URL = "file:/data/dev.db"
+  # Uploaded photos are stored in Tigris object storage (the `fly ext tigris create`
+  # extension injects BUCKET_NAME + AWS_* credentials as secrets — see src/lib/storage.ts,
+  # which auto-selects Tigris when those are present). STORAGE_DIR is only a fallback for
+  # the local-filesystem backend if the Tigris secrets are ever missing; it points at the
+  # volume so even that fallback persists.
   STORAGE_DIR = "/data/storage"
 
 # Runs `prisma migrate deploy` in a fresh machine before each deploy is promoted,

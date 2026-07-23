@@ -101,26 +101,30 @@ its findings/photos/cost items (the UI confirms before deleting anything non-emp
 ## Deploying to Fly.io
 
 Vercel/Netlify won't work for this app as-is: both run on an ephemeral, read-only
-filesystem, and this app stores its SQLite database file and uploaded photos on local disk.
-Fly.io supports persistent volumes on its free allowance, so the app can deploy there with
-**zero changes** to the SQLite/local-storage architecture. `Dockerfile`, `fly.toml`, and
-`.dockerignore` in the repo root implement this:
+filesystem, and this app keeps its SQLite database file on local disk. Fly.io supports
+persistent volumes on its free allowance, so the database can live on a volume, while
+uploaded photos go to **Tigris object storage** (S3-compatible, provisioned by Fly's Tigris
+extension). `Dockerfile`, `fly.toml`, and `.dockerignore` in the repo root implement this:
 
 - `Dockerfile` — multi-stage build. `deps` installs dependencies (with build tools, in case
   better-sqlite3/sharp need to compile native bindings for the target platform); `builder`
   runs `prisma generate` and `next build` (using `output: "standalone"` from
   `next.config.ts`, which traces only the files actually needed at runtime); `runner` is the
-  slim production image — it also globally installs the `prisma` CLI (not included in the
+  slim production image — it also installs the `prisma` CLI locally (not included in the
   standalone trace, since it's a dev-time tool) so `prisma migrate deploy` can run at deploy
   time.
-- `fly.toml` — mounts a persistent volume at `/data`, and points `DATABASE_URL` at
-  `file:/data/dev.db` and `STORAGE_DIR` at `/data/storage` so the database and photos survive
-  restarts and redeploys. `release_command = "prisma migrate deploy"` applies pending
-  migrations before each deploy is promoted.
+- `fly.toml` — mounts a persistent volume at `/data` and points `DATABASE_URL` at
+  `file:/data/dev.db` so the database survives restarts and redeploys. Photo storage is
+  backed by Tigris: `src/lib/storage.ts` auto-selects the Tigris (S3) backend when
+  `BUCKET_NAME` + `AWS_*` credentials are present (Fly injects them as secrets), and falls
+  back to the local filesystem otherwise. `release_command = "prisma migrate deploy"` applies
+  pending migrations before each deploy is promoted.
 
 **Important**: a Fly volume is pinned to a single machine, and SQLite is single-writer — do
 **not** scale this app beyond 1 machine (don't set `min_machines_running` above 1 or add
-`[[services]].concurrency`-based autoscaling that spins up parallel machines).
+`[[services]].concurrency`-based autoscaling that spins up parallel machines). (Photos now
+live in Tigris rather than on the volume, but the SQLite database still pins the app to one
+machine.)
 
 ### First-time setup
 
@@ -133,11 +137,15 @@ fly auth login
 fly launch --no-deploy --copy-config
 fly volumes create maltaman_data --size 1 --region fra
 
-# 3. Set secrets (never commit these — DATABASE_URL/STORAGE_DIR are already in fly.toml
+# 3. Provision a Tigris bucket for photo storage. This sets BUCKET_NAME + AWS_* secrets on
+# the app automatically. (Already have one? Skip this — re-running errors if it exists.)
+fly ext tigris create
+
+# 4. Set secrets (never commit these — DATABASE_URL/STORAGE_DIR are already in fly.toml
 # since they're just paths, not secrets)
 fly secrets set AUTH_SECRET="$(openssl rand -base64 32)"
 
-# 4. Deploy
+# 5. Deploy
 fly deploy
 ```
 
