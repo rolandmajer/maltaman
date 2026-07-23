@@ -296,3 +296,17 @@ export const appSettingsUpdateSchema = z.object({
   costCategoryPresets: z.array(z.string()).optional(),
   roomTypePresets: z.array(z.string()).optional(),
 });
+
+// ---------------------------------------------------------------------------
+// User management (admin only)
+// ---------------------------------------------------------------------------
+
+export const userRoleSchema = z.enum(["ADMIN", "TECHNICIAN"]);
+
+export const userCreateSchema = z.object({
+  name: z.string().trim().min(1, "Zadajte meno"),
+  email: z.string().trim().email("Zadajte platný e-mail"),
+  password: z.string().min(8, "Heslo musí mať aspoň 8 znakov"),
+  role: userRoleSchema.default("TECHNICIAN"),
+  registrationNumber: z.string().trim().optional(),
+});
