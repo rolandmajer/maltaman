@@ -9,7 +9,10 @@ primary_region = 'fra'
 [build]
 
 [deploy]
-  release_command = 'prisma migrate deploy'
+  # scripts/release.sh applies pending migrations, then bootstraps the admin login from
+  # ADMIN_EMAIL/ADMIN_PASSWORD secrets if set (no-op otherwise). See README "Creating your
+  # first login".
+  release_command = 'sh scripts/release.sh'
 
 [env]
   DATABASE_URL = 'file:/data/dev.db'
