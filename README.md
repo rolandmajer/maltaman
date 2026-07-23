@@ -110,9 +110,9 @@ extension). `Dockerfile`, `fly.toml`, and `.dockerignore` in the repo root imple
   better-sqlite3/sharp need to compile native bindings for the target platform); `builder`
   runs `prisma generate` and `next build` (using `output: "standalone"` from
   `next.config.ts`, which traces only the files actually needed at runtime); `runner` is the
-  slim production image — it also installs the `prisma` CLI locally (not included in the
-  standalone trace, since it's a dev-time tool). Its entrypoint is `scripts/start.sh`, which
-  runs `prisma migrate deploy` and then starts the server.
+  slim production image — it also installs the `prisma` CLI and `tsx` locally (not included in
+  the standalone trace, since they're dev-time tools). Its entrypoint is `scripts/start.sh`,
+  which runs `prisma migrate deploy`, bootstraps the admin login, then starts the server.
 - `fly.toml` — mounts a persistent volume at `/data` and points `DATABASE_URL` at
   `file:/data/dev.db` so the database survives restarts and redeploys. Photo storage is
   backed by Tigris: `src/lib/storage.ts` auto-selects the Tigris (S3) backend when
@@ -156,9 +156,9 @@ volume database and then starts serving.
 
 **Creating your first login.** The app has no public sign-up, and seeding is intentionally
 **not** run in production (the seed creates a demo account with a known password *and* loads
-sample inspections). Instead, the app bootstraps a real admin account from secrets at startup
-(`src/instrumentation.ts` → `src/lib/bootstrap-admin.ts`) — no SSH or terminal required, so it
-works entirely from the Fly.io dashboard:
+sample inspections). Instead, the container entrypoint bootstraps a real admin account from
+secrets at startup (`scripts/start.sh` → `scripts/bootstrap-admin.ts`) — no SSH or terminal
+required, so it works entirely from the Fly.io dashboard:
 
 1. Set two secrets on the app (**Secrets** tab in the dashboard, or the CLI):
 
