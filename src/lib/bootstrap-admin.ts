@@ -10,6 +10,27 @@ export type BootstrapResult = {
   message: string;
 };
 
+// Runs bootstrapAdmin() at most once per server process (per cold start), swallowing errors so
+// it can never break page rendering. Called when the /login page loads so the first admin is
+// created automatically the moment someone opens the app — no special URL needed. A "skipped"
+// result (secrets not set yet) or a failure is not cached, so a later load retries.
+let bootstrapOnce: Promise<void> | null = null;
+export function ensureAdminBootstrapped(): Promise<void> {
+  if (!bootstrapOnce) {
+    bootstrapOnce = (async () => {
+      try {
+        const result = await bootstrapAdmin();
+        console.log(`[admin-bootstrap] ${result.status}: ${result.message}`);
+        if (result.status === "skipped") bootstrapOnce = null; // retry once secrets appear
+      } catch (error) {
+        console.error("[admin-bootstrap] failed:", error);
+        bootstrapOnce = null; // allow a later attempt
+      }
+    })();
+  }
+  return bootstrapOnce;
+}
+
 /**
  * Ensures an admin login exists, driven by ADMIN_* environment variables. Runs inside the app
  * server (via GET /api/bootstrap-admin) — using the app's own working Prisma client and the
