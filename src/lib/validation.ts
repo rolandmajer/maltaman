@@ -310,3 +310,8 @@ export const userCreateSchema = z.object({
   role: userRoleSchema.default("TECHNICIAN"),
   registrationNumber: z.string().trim().optional(),
 });
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, "Zadajte súčasné heslo"),
+  newPassword: z.string().min(8, "Nové heslo musí mať aspoň 8 znakov"),
+});

@@ -164,8 +164,85 @@ export function SettingsClient({ isAdmin, currentUserId }: { isAdmin: boolean; c
         <p className="text-xs text-slate-400">Tento zoznam sa použije pri vytváraní novej obhliadky.</p>
       </StepSection>
 
+      <PasswordSection />
+
       {isAdmin && <UsersSection currentUserId={currentUserId} />}
     </div>
+  );
+}
+
+function PasswordSection() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function changePassword() {
+    if (newPassword.length < 8) {
+      toast.error("Nové heslo musí mať aspoň 8 znakov");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Nové heslá sa nezhodujú");
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiPost("/api/account/password", { currentPassword, newPassword }, "Zmena hesla");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Heslo bolo zmenené");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Zmena hesla zlyhala");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <StepSection title="Zmena hesla" description="Zmena hesla pre váš vlastný účet.">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pw-current">Súčasné heslo</Label>
+          <Input
+            id="pw-current"
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pw-new">Nové heslo (min. 8 znakov)</Label>
+          <Input
+            id="pw-new"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pw-confirm">Nové heslo znova</Label>
+          <Input
+            id="pw-confirm"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+        </div>
+      </div>
+      <Button
+        size="sm"
+        className="mt-1 self-start"
+        onClick={() => void changePassword()}
+        disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+      >
+        {saving ? "Ukladám…" : "Zmeniť heslo"}
+      </Button>
+    </StepSection>
   );
 }
 
