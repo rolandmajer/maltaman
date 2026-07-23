@@ -10,25 +10,46 @@ export type BootstrapResult = {
   message: string;
 };
 
-// Runs bootstrapAdmin() at most once per server process (per cold start), swallowing errors so
-// it can never break page rendering. Called when the /login page loads so the first admin is
-// created automatically the moment someone opens the app — no special URL needed. A "skipped"
-// result (secrets not set yet) or a failure is not cached, so a later load retries.
-let bootstrapOnce: Promise<void> | null = null;
-export function ensureAdminBootstrapped(): Promise<void> {
-  if (!bootstrapOnce) {
-    bootstrapOnce = (async () => {
-      try {
-        const result = await bootstrapAdmin();
-        console.log(`[admin-bootstrap] ${result.status}: ${result.message}`);
-        if (result.status === "skipped") bootstrapOnce = null; // retry once secrets appear
-      } catch (error) {
-        console.error("[admin-bootstrap] failed:", error);
-        bootstrapOnce = null; // allow a later attempt
-      }
-    })();
+export type SetupStatus = {
+  result: BootstrapResult;
+  /** The admin account's e-mail exactly as stored in the database (surfaces typos in ADMIN_EMAIL). */
+  adminEmail: string | null;
+  /** Length of the configured ADMIN_PASSWORD (surfaces trailing spaces / wrong value without revealing it). */
+  passwordLength: number | null;
+  forceReset: boolean;
+};
+
+/**
+ * Setup-mode status for the login page. Returns null once the ADMIN_* secrets are removed —
+ * which also removes the setup banner the login page renders from this. While the secrets ARE
+ * set, every login-page load runs the (idempotent) bootstrap and reports what happened, so the
+ * operator can see the state directly on the page instead of digging through logs. Wrapped so a
+ * failure can never break page rendering.
+ */
+export async function getSetupStatus(): Promise<SetupStatus | null> {
+  const email = process.env.ADMIN_EMAIL?.trim();
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email && !password) return null;
+
+  try {
+    const result = await bootstrapAdmin();
+    console.log(`[admin-bootstrap] ${result.status}: ${result.message}`);
+    const stored = email ? await db.user.findUnique({ where: { email } }) : null;
+    return {
+      result,
+      adminEmail: stored?.email ?? null,
+      passwordLength: password?.length ?? null,
+      forceReset: /^(1|true|yes|on)$/i.test((process.env.ADMIN_FORCE_RESET ?? "").trim()),
+    };
+  } catch (error) {
+    console.error("[admin-bootstrap] failed:", error);
+    return {
+      result: { status: "skipped", message: `Bootstrap zlyhal: ${error instanceof Error ? error.message : String(error)}` },
+      adminEmail: null,
+      passwordLength: password?.length ?? null,
+      forceReset: false,
+    };
   }
-  return bootstrapOnce;
 }
 
 /**
