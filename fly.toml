@@ -8,11 +8,9 @@ primary_region = 'fra'
 
 [build]
 
-[deploy]
-  # scripts/release.sh applies pending migrations, then bootstraps the admin login from
-  # ADMIN_EMAIL/ADMIN_PASSWORD secrets if set (no-op otherwise). See README "Creating your
-  # first login".
-  release_command = 'sh scripts/release.sh'
+# No release_command: this app's database is SQLite on the mounted volume, but Fly's
+# release_command machine has no volume attached — so migrations run at container startup
+# instead, in the app machine that actually has the volume (see scripts/start.sh + Dockerfile).
 
 [env]
   DATABASE_URL = 'file:/data/dev.db'
