@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ photoId: st
     }
 
     const wantsThumb = req.nextUrl.searchParams.get("thumb") === "1";
-    const bytes = await readPhotoFile(wantsThumb && photo.thumbnailKey ? photo.thumbnailKey : photo.storageKey, wantsThumb);
+    const bytes = await readPhotoFile(wantsThumb && photo.thumbnailKey ? photo.thumbnailKey : photo.storageKey);
 
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
