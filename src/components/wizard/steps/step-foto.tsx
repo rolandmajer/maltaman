@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Star, EyeOff, RotateCw, Upload } from "lucide-react";
+import { Camera, ImagePlus, Star, EyeOff, RotateCw, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useInspectionContext } from "@/lib/inspection-context";
 import { apiPatch, apiUpload, apiDelete } from "@/lib/offline/api-client";
@@ -26,6 +26,7 @@ export function StepFoto() {
   const [uploading, setUploading] = useState(false);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const photos = inspection.photos.slice().sort((a, b) => a.order - b.order);
   const activePhoto = photos.find((p) => p.id === activePhotoId) ?? null;
@@ -49,6 +50,7 @@ export function StepFoto() {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
     }
   }
 
@@ -75,17 +77,28 @@ export function StepFoto() {
         title={`Fotografie (${photos.length})`}
         actions={
           <div className="flex gap-2">
+            {/* `capture` forces the camera, so the gallery needs its own input without it. */}
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
               capture="environment"
+              className="hidden"
+              onChange={(e) => void handleFiles(e.target.files)}
+            />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
               multiple
               className="hidden"
               onChange={(e) => void handleFiles(e.target.files)}
             />
             <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-              <Camera /> {uploading ? "Nahrávam…" : "Fotiť / nahrať"}
+              <Camera /> {uploading ? "Nahrávam…" : "Fotiť"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => galleryInputRef.current?.click()} disabled={uploading}>
+              <ImagePlus /> Z galérie
             </Button>
           </div>
         }
