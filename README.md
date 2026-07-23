@@ -111,14 +111,16 @@ extension). `Dockerfile`, `fly.toml`, and `.dockerignore` in the repo root imple
   runs `prisma generate` and `next build` (using `output: "standalone"` from
   `next.config.ts`, which traces only the files actually needed at runtime); `runner` is the
   slim production image — it also installs the `prisma` CLI locally (not included in the
-  standalone trace, since it's a dev-time tool) so `prisma migrate deploy` can run at deploy
-  time.
+  standalone trace, since it's a dev-time tool). Its entrypoint is `scripts/start.sh`, which
+  runs `prisma migrate deploy` and then starts the server.
 - `fly.toml` — mounts a persistent volume at `/data` and points `DATABASE_URL` at
   `file:/data/dev.db` so the database survives restarts and redeploys. Photo storage is
   backed by Tigris: `src/lib/storage.ts` auto-selects the Tigris (S3) backend when
   `BUCKET_NAME` + `AWS_*` credentials are present (Fly injects them as secrets), and falls
-  back to the local filesystem otherwise. `release_command = "prisma migrate deploy"` applies
-  pending migrations before each deploy is promoted.
+  back to the local filesystem otherwise. There is deliberately **no** `release_command`:
+  migrations run at container startup instead, because Fly's release-command machine has no
+  volume mounted, so it can't migrate the real SQLite database — only the app machine (which
+  has the volume) can.
 
 **Important**: a Fly volume is pinned to a single machine, and SQLite is single-writer — do
 **not** scale this app beyond 1 machine (don't set `min_machines_running` above 1 or add
@@ -149,13 +151,14 @@ fly secrets set AUTH_SECRET="$(openssl rand -base64 32)"
 fly deploy
 ```
 
-`fly deploy` builds the Docker image, runs the release command (`scripts/release.sh` — pending
-migrations, then the admin bootstrap below), then starts the app.
+`fly deploy` builds the Docker image; on startup the app applies pending migrations to the
+volume database and then starts serving.
 
 **Creating your first login.** The app has no public sign-up, and seeding is intentionally
 **not** run in production (the seed creates a demo account with a known password *and* loads
-sample inspections). Instead, the release command bootstraps a real admin account from
-secrets — no SSH or terminal required, so it works entirely from the Fly.io dashboard:
+sample inspections). Instead, the app bootstraps a real admin account from secrets at startup
+(`src/instrumentation.ts` → `src/lib/bootstrap-admin.ts`) — no SSH or terminal required, so it
+works entirely from the Fly.io dashboard:
 
 1. Set two secrets on the app (**Secrets** tab in the dashboard, or the CLI):
 
@@ -163,18 +166,18 @@ secrets — no SSH or terminal required, so it works entirely from the Fly.io da
    fly secrets set ADMIN_EMAIL="you@example.com" ADMIN_PASSWORD="a-strong-password"
    ```
 
-2. Deploy (or redeploy). On the next release, `scripts/create-admin.ts` runs and creates the
-   admin account. Then log in with that e-mail and password.
+2. Deploy or restart. When the server boots it creates the admin account. Then log in with that
+   e-mail and password.
 
-The bootstrap is safe to leave in place: once the account exists it is **not** overwritten on
-later deploys, so a password you change inside the app sticks. To deliberately reset the
-password, set `ADMIN_FORCE_RESET=true` (plus a new `ADMIN_PASSWORD`) and redeploy, then unset
-it. If the secrets aren't set, the step simply no-ops.
+Doing this at startup (rather than in a release command) is deliberate: the bootstrap needs the
+volume database, which only the app machine has. It's safe to leave in place — once the account
+exists it is **not** overwritten on later restarts, so a password you change inside the app
+sticks. To deliberately reset the password, set `ADMIN_FORCE_RESET=true` (plus a new
+`ADMIN_PASSWORD`) and redeploy/restart, then unset it. If the secrets aren't set, the step
+simply no-ops.
 
-If you have the Fly CLI, you can also run it on demand without redeploying:
-`fly ssh console -C "tsx scripts/create-admin.ts"`. (The full `prisma/seed.ts` — which loads
-demo data — depends on dev-only sources that aren't in the slim runtime image, so it's for
-local development only, not production.)
+(The full `prisma/seed.ts` — which loads demo data — is for local development only, not
+production.)
 
 Subsequent deploys are just `fly deploy` again; migrations and data on the volume persist.
 
