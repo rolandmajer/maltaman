@@ -39,11 +39,21 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+# Put the locally-installed Prisma CLI (below) on PATH so fly.toml's bare
+# `release_command = "prisma migrate deploy"` resolves it.
+ENV PATH="/app/node_modules/.bin:${PATH}"
 
-# Prisma's CLI (not bundled by `output: standalone`, which only traces runtime
+# The Prisma CLI (not bundled by `output: standalone`, which only traces runtime
 # code) is needed at deploy time to run `prisma migrate deploy` — see fly.toml's
-# `release_command`. Version pinned to match package.json's devDependency.
-RUN npm install --global prisma@7.9.0
+# `release_command`. Install it *locally* into /app (not globally): under Prisma 7
+# the CLI loads `prisma.config.ts`, whose `prisma/config` and `dotenv/config`
+# imports must resolve from /app's node_modules — a global install is invisible to
+# that resolution. Installed before the standalone copy below so Docker's COPY
+# merges the traced runtime node_modules on top without npm pruning either set.
+# `dotenv` backs prisma.config.ts's `import "dotenv/config"`; on Fly the real env
+# vars are injected by the platform, so it simply finds no .env and moves on.
+# Versions pinned to match package.json.
+RUN npm install --no-save prisma@7.9.0 dotenv@17.4.2
 
 # `node:22` images already ship a non-root `node` user (uid 1000) — reuse it
 # instead of creating a new one.
@@ -53,6 +63,9 @@ COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/prisma ./prisma
+# prisma.config.ts lives at the repo root, so it isn't part of /app/prisma above;
+# the CLI needs it alongside the schema to know the datasource URL for migrations.
+COPY --from=builder --chown=node:node /app/prisma.config.ts ./prisma.config.ts
 
 USER node
 EXPOSE 3000
