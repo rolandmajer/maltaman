@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --background: #f7f8fa;
+  --foreground: #101828;
+
+  --brand-50: #eef4f3;
+  --brand-100: #d3e3e0;
+  --brand-200: #a7c7c1;
+  --brand-300: #7bafa1;
+  --brand-400: #4f8f81;
+  --brand-500: #2f6f61;
+  --brand-600: #235a4e;
+  --brand-700: #1c473e;
+  --brand-800: #163730;
+  --brand-900: #102923;
+
+  --status-ok: #1c7a3b;
+  --status-v: #b45309;
+  --status-r: #b91c1c;
+  --status-n: #6b7280;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  --color-status-ok: var(--status-ok);
+  --color-status-v: var(--status-v);
+  --color-status-r: var(--status-r);
+  --color-status-n: var(--status-n);
+}
+
+/*
+ * This is a light-theme-only data entry tool: components use explicit slate/white
+ * Tailwind classes rather than dark-mode-aware tokens, so the page background is
+ * pinned to light regardless of system color scheme to avoid unreadable contrast.
+ */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: 2px;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

@@ -1,0 +1,41 @@
+# fly.toml — generated for the MALTAMAN app's Docker/Fly.io deployment.
+# Run `fly launch --no-deploy --copy-config` (or edit `app`/`primary_region` below) before
+# the first deploy — app names are globally unique on Fly.io. See README.md's
+# "Deploying to Fly.io" section for the full walkthrough.
+
+app = "maltaman-app"
+primary_region = "fra"
+
+[build]
+
+[env]
+  PORT = "3000"
+  NODE_ENV = "production"
+  # SQLite DB file and photo storage both live on the mounted volume below so they
+  # survive deploys/restarts. Not secret (just a path) — safe to keep in plain env.
+  DATABASE_URL = "file:/data/dev.db"
+  STORAGE_DIR = "/data/storage"
+
+# Runs `prisma migrate deploy` in a fresh machine before each deploy is promoted,
+# with the volume mounted and secrets available — see `fly secrets set AUTH_SECRET=...`
+# in the README before the first deploy.
+[deploy]
+  release_command = "prisma migrate deploy"
+
+[[mounts]]
+  source = "maltaman_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # SQLite + a Fly volume is single-writer: the volume is pinned to one machine,
+  # so this app must never be scaled beyond 1 machine.
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

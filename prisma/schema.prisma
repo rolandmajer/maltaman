@@ -1,0 +1,571 @@
+// Prisma schema for MALTAMAN — Protokol z obhliadky nehnuteľnosti
+// SQLite for local development; field types kept portable for a future PostgreSQL migration
+// (no SQLite-only types are used beyond the default String/Int/Float/Boolean/DateTime).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy & users
+// ---------------------------------------------------------------------------
+
+model Organisation {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users       User[]
+  inspections Inspection[]
+  settings    AppSettings?
+}
+
+enum UserRole {
+  ADMIN
+  TECHNICIAN
+}
+
+model User {
+  id                 String       @id @default(cuid())
+  organisationId     String
+  organisation       Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  name               String
+  email              String       @unique
+  passwordHash       String
+  role               UserRole     @default(TECHNICIAN)
+  registrationNumber String? // osvedčenie / registration or certificate number
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  inspectionsCreated Inspection[]     @relation("InspectionCreatedBy")
+  reportRevisions    ReportRevision[]
+
+  @@index([organisationId])
+}
+
+model AppSettings {
+  id             String       @id @default(cuid())
+  organisationId String       @unique
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  companyName    String  @default("MALTAMAN")
+  companyTagline String  @default("Nezávislé stavebné poradenstvo")
+  companyAddress String  @default("")
+  companyIco     String  @default("")
+  companyDic     String  @default("")
+  companyPhone   String  @default("")
+  companyEmail   String  @default("")
+  companyWeb     String  @default("")
+  logoUrl        String?
+
+  protocolNumberPrefix      String  @default("PZ")
+  defaultVatRatePercent     Float   @default(23)
+  defaultContingencyPercent Float   @default(10)
+  gpsCaptureEnabled         Boolean @default(false)
+  dataRetentionMonths       Int?    @default(60)
+
+  legalVisualNonDestructive String @default("Obhliadka bola vykonaná vizuálne a nedeštruktívne, v rozsahu prístupných častí nehnuteľnosti ku dňu obhliadky.")
+  legalNotAReplacement      String @default("Protokol nenahrádza statický posudok, revíznu správu ani znalecký posudok v zmysle osobitných predpisov.")
+  legalHiddenDefects        String @default("Skryté vady, ktoré nebolo možné zistiť vizuálnou obhliadkou (napr. pod podlahami, v konštrukciách, v zakrytých rozvodoch), nie sú predmetom tohto protokolu.")
+  legalLimitedByAccess      String @default("Závery sú obmedzené rozsahom prístupu a podmienkami v čase obhliadky.")
+  legalCostsIndicative      String @default("Odhady nákladov sú orientačné, v cenovej úrovni ku dňu obhliadky, a slúžia ako podklad pre rozhodovanie a vyjednávanie klienta.")
+  legalClientOnly           String @default("Protokol je určený výhradne pre objednávateľa a nesmie byť bez súhlasu poradcu poskytnutý tretím stranám na komerčné účely.")
+
+  updatedAt DateTime @updatedAt
+
+  costCategoryPresets String @default("[]") // JSON string[] of default cost category names, editable
+  roomTypePresets     String @default("[]") // JSON string[] of default room type names, editable
+}
+
+// ---------------------------------------------------------------------------
+// Inspection root
+// ---------------------------------------------------------------------------
+
+enum InspectionStatus {
+  DRAFT
+  COMPLETED
+}
+
+enum OverallVerdict {
+  PURCHASE_NO_OBJECTIONS
+  PURCHASE_WITH_DISCOUNT
+  FURTHER_ASSESSMENT_NEEDED
+  PURCHASE_NOT_RECOMMENDED
+}
+
+enum OverallConditionRating {
+  VYBORNY
+  DOBRY
+  PRIEMERNY
+  ZHORSENY
+  ZLY
+}
+
+model Inspection {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdById    String
+  createdBy      User         @relation("InspectionCreatedBy", fields: [createdById], references: [id])
+
+  protocolNumber String
+  status         InspectionStatus @default(DRAFT)
+
+  inspectionDate DateTime?
+  startTime      String? // "HH:mm"
+  endTime        String? // "HH:mm"
+
+  propertyType String? // byt / dom / novostavba / ...
+  purpose      String? // účel obhliadky (kúpa, predaj, reklamácia, ...)
+
+  generalNote String @default("")
+
+  // step 5 — zhrnutie
+  overallConditionRating OverallConditionRating?
+  mainRisks              String                  @default("")
+  immediateActions       String                  @default("")
+  followUpInspections    String                  @default("")
+
+  // step 7 — odporúčanie / záver
+  overallVerdict            OverallVerdict?
+  recommendedDiscountAmount Float?
+  verdictJustification      String          @default("")
+
+  // step 6 — cost estimate options
+  contingencyPercent Float   @default(0)
+  costsIncludeVat    Boolean @default(true)
+
+  // revisions
+  revisionNumber     Int          @default(1)
+  parentInspectionId String?
+  parentInspection   Inspection?  @relation("InspectionRevisions", fields: [parentInspectionId], references: [id])
+  revisions          Inspection[] @relation("InspectionRevisions")
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  property        Property?
+  conditions      InspectionConditions?
+  participants    Participant[]
+  rooms           Room[]
+  categories      InspectionCategory[]
+  findings        Finding[]
+  photos          Photo[]
+  costCategories  CostCategory[]
+  costItems       CostItem[]
+  recommendations Recommendation[]
+  signatures      Signature[]
+  reportRevisions ReportRevision[]
+
+  @@unique([organisationId, protocolNumber])
+  @@index([organisationId, status])
+}
+
+model Property {
+  id           String     @id @default(cuid())
+  inspectionId String     @unique
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  address            String @default("")
+  apartmentNumber    String @default("")
+  floor              String @default("")
+  municipality       String @default("")
+  postalCode         String @default("")
+  district           String @default("")
+  cadastralArea      String @default("")
+  parcelNumber       String @default("")
+  landRegistryNumber String @default("") // list vlastníctva
+  constructionYear   Int?
+  lastRenovationYear Int?
+  totalFloorAreaM2   Float?
+  occupancyStatus    String @default("") // obývaná / prázdna / zariadená
+  administratorName  String @default("") // správca / spoločenstvo
+  ownerName          String @default("")
+  ownerContact       String @default("")
+}
+
+model InspectionConditions {
+  id           String     @id @default(cuid())
+  inspectionId String     @unique
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  weather             String @default("")
+  outdoorTemperatureC Float?
+  occupancy           String @default("") // obsadenosť pri obhliadke
+  accessibility       String @default("")
+  lighting            String @default("")
+  equipmentCondition  String @default("")
+  limitations         String @default("") // obmedzenia / neprístupné časti
+  measuringDevices    String @default("")
+  notes               String @default("")
+}
+
+model Participant {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  fullName     String
+  organisation String @default("")
+  role         String @default("") // funkcia / vzťah k nehnuteľnosti
+  phone        String @default("")
+  email        String @default("")
+  presentFrom  String @default("")
+  presentTo    String @default("")
+  note         String @default("")
+  order        Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([inspectionId])
+}
+
+// ---------------------------------------------------------------------------
+// Rooms (fully dynamic)
+// ---------------------------------------------------------------------------
+
+model Room {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  name             String
+  type             String // preset key or custom label
+  floorLevel       String @default("")
+  lengthM          Float?
+  widthM           Float?
+  heightM          Float?
+  areaOverrideM2   Float?
+  generalCondition String @default("")
+  accessibility    String @default("")
+  notes            String @default("")
+  order            Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  findings        Finding[]
+  photos          Photo[]
+  costItems       CostItem[]
+  recommendations Recommendation[]
+
+  @@index([inspectionId])
+}
+
+// ---------------------------------------------------------------------------
+// Building-wide technical condition (step 4)
+// ---------------------------------------------------------------------------
+
+model InspectionCategory {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  name     String
+  order    Int     @default(0)
+  isCustom Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  elements InspectionElement[]
+
+  @@index([inspectionId])
+}
+
+model InspectionElement {
+  id         String             @id @default(cuid())
+  categoryId String
+  category   InspectionCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  name     String
+  order    Int     @default(0)
+  isCustom Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  findings  Finding[]
+  photos    Photo[]
+  costItems CostItem[]
+
+  @@index([categoryId])
+}
+
+// ---------------------------------------------------------------------------
+// Findings — unifies room checklist rows, technical element rows, and ad-hoc findings
+// ---------------------------------------------------------------------------
+
+enum FindingStatus {
+  OK
+  V // vada
+  R // riziko
+  N // neposudzované / neprístupné / nevzťahuje sa
+}
+
+enum FindingSeverity {
+  KRITICKA
+  ZAVAZNA
+  STREDNA
+  DROBNA
+  INFORMATIVNA
+}
+
+enum Priority {
+  IMMEDIATE
+  WITHIN_3_MONTHS
+  WITHIN_1_YEAR
+  LONG_TERM
+  OPTIONAL
+}
+
+model Finding {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  roomId    String?
+  room      Room?              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  elementId String?
+  element   InspectionElement? @relation(fields: [elementId], references: [id], onDelete: Cascade)
+
+  checklistKey String? // e.g. "podlaha", "elektroinstalacia" — null for ad-hoc findings
+  label        String // display title of the prvok / finding
+
+  status                FindingStatus    @default(OK)
+  description           String           @default("")
+  severity              FindingSeverity?
+  location              String           @default("")
+  recommendedAction     String           @default("")
+  recommendedSpecialist String           @default("")
+  urgency               Priority?
+  isPositiveObservation Boolean          @default(false)
+  includeInSummary      Boolean          @default(true)
+  order                 Int              @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  measurements    Measurement[]
+  photos          Photo[]
+  costItems       CostItem[]
+  recommendations Recommendation[]
+
+  @@index([inspectionId])
+  @@index([roomId])
+  @@index([elementId])
+}
+
+model Measurement {
+  id        String  @id @default(cuid())
+  findingId String
+  finding   Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  label String
+  value Float
+  unit  String
+  note  String @default("")
+  order Int    @default(0)
+
+  @@index([findingId])
+}
+
+// ---------------------------------------------------------------------------
+// Photos
+// ---------------------------------------------------------------------------
+
+model Photo {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  roomId    String?
+  room      Room?              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  findingId String?
+  finding   Finding?           @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  elementId String?
+  element   InspectionElement? @relation(fields: [elementId], references: [id], onDelete: Cascade)
+
+  storageKey        String // path within private storage dir
+  thumbnailKey      String?
+  caption           String  @default("")
+  rotationDegrees   Int     @default(0)
+  annotationsJson   String  @default("[]") // markup shapes: arrows/circles/labels
+  isCover           Boolean @default(false)
+  excludeFromReport Boolean @default(false)
+  order             Int     @default(0)
+
+  capturedAt DateTime?
+  gpsLat     Float?
+  gpsLng     Float?
+
+  createdAt DateTime @default(now())
+
+  @@index([inspectionId])
+  @@index([roomId])
+  @@index([findingId])
+  @@index([elementId])
+}
+
+// ---------------------------------------------------------------------------
+// Cost estimate
+// ---------------------------------------------------------------------------
+
+enum CostUnit {
+  KS
+  M
+  M2
+  M3
+  HOD
+  DEN
+  SUBOR
+  PAUSAL
+}
+
+model CostCategory {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  name     String
+  order    Int     @default(0)
+  isCustom Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  costItems CostItem[]
+
+  @@index([inspectionId])
+}
+
+model CostItem {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   CostCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  roomId    String?
+  room      Room?              @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  findingId String?
+  finding   Finding?           @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  elementId String?
+  element   InspectionElement? @relation(fields: [elementId], references: [id], onDelete: SetNull)
+
+  name        String
+  description String @default("")
+
+  quantity  Float    @default(1)
+  unit      CostUnit @default(KS)
+  unitPrice Float    @default(0)
+
+  laborCost    Float @default(0)
+  materialCost Float @default(0)
+  otherCost    Float @default(0)
+
+  vatRatePercent Float @default(23)
+
+  minEstimate      Float?
+  expectedEstimate Float?
+  maxEstimate      Float?
+
+  priority          Priority @default(OPTIONAL)
+  completionHorizon String   @default("")
+  supplier          String   @default("")
+  source            String   @default("")
+  notes             String   @default("")
+  included          Boolean  @default(true)
+  order             Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([inspectionId])
+  @@index([categoryId])
+  @@index([roomId])
+  @@index([findingId])
+  @@index([elementId])
+}
+
+// ---------------------------------------------------------------------------
+// Recommendations
+// ---------------------------------------------------------------------------
+
+enum RecommendationCategory {
+  IMMEDIATE_SAFETY
+  REQUIRED_REPAIR
+  SPECIALIST_ASSESSMENT
+  REVISIONS_TESTS
+  DOCUMENTS_TO_REQUEST
+  MAINTENANCE
+  NEGOTIATION
+  CONCLUSION
+}
+
+model Recommendation {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  category String // RecommendationCategory value, stored as string for flexibility
+  text     String
+
+  relatedRoomId    String?
+  relatedRoom      Room?    @relation(fields: [relatedRoomId], references: [id], onDelete: SetNull)
+  relatedFindingId String?
+  relatedFinding   Finding? @relation(fields: [relatedFindingId], references: [id], onDelete: SetNull)
+
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([inspectionId])
+}
+
+// ---------------------------------------------------------------------------
+// Signatures & revisions
+// ---------------------------------------------------------------------------
+
+enum SignatureRole {
+  TECHNICIAN
+  TECHNICIAN2
+  CLIENT
+}
+
+model Signature {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  role               SignatureRole
+  fullName           String
+  organisationName   String        @default("")
+  registrationNumber String        @default("")
+  place              String        @default("")
+  signedAt           DateTime?
+  imageDataUrl       String? // base64 PNG of drawn signature
+
+  createdAt DateTime @default(now())
+
+  @@index([inspectionId])
+}
+
+model ReportRevision {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  revisionNumber Int
+  note           String @default("")
+  createdById    String
+  createdBy      User   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([inspectionId])
+}
