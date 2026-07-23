@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Copy, Download, FileText, Printer, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Copy, Download, FileText, Mail, Printer, RefreshCw, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useInspectionContext } from "@/lib/inspection-context";
 import { apiGet, apiPost } from "@/lib/offline/api-client";
+import { clientEmailFor, reportEmailBody, reportEmailSubject, reportFileName, reportMailtoUrl } from "@/lib/share-report";
 import { StepPageHeader, StepSection } from "@/components/wizard/step-section";
 import { Button } from "@/components/ui/button";
 import { WIZARD_STEPS } from "@/lib/constants";
@@ -23,6 +24,86 @@ export function StepExport() {
   }, [inspection]);
 
   const pdfUrl = `/api/inspections/${inspection.id}/pdf`;
+
+  async function fetchPdfFile(): Promise<File> {
+    const res = await fetch(pdfUrl);
+    if (!res.ok) throw new Error("Nepodarilo sa vygenerovať PDF");
+    const blob = await res.blob();
+    return new File([blob], reportFileName(inspection), { type: "application/pdf" });
+  }
+
+  function downloadFile(file: File) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /** True when the browser can hand the PDF to the native share sheet (mobile). */
+  function canShareFiles(file: File): boolean {
+    return typeof navigator.share === "function" && !!navigator.canShare?.({ files: [file] });
+  }
+
+  async function shareViaSheet(file: File) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: reportEmailSubject(inspection),
+        text: reportEmailBody(inspection),
+      });
+    } catch (error) {
+      // Closing the share sheet without picking a target is not an error.
+      if (error instanceof Error && error.name === "AbortError") return;
+      throw error;
+    }
+  }
+
+  // Native share sheet with the PDF attached (Mail, WhatsApp, AirDrop, …). Falls back to a
+  // plain download in browsers without the Web Share API (typically desktop).
+  async function handleShare() {
+    setBusy("share");
+    try {
+      const file = await fetchPdfFile();
+      if (canShareFiles(file)) {
+        await shareViaSheet(file);
+      } else {
+        downloadFile(file);
+        toast.info("Tento prehliadač nepodporuje zdieľanie — PDF bolo stiahnuté.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Zdieľanie zlyhalo");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // E-mail to the client. A mailto: link cannot carry an attachment, so on mobile this opens
+  // the share sheet with the PDF attached (choose Mail there) after copying the client's
+  // address to the clipboard; on desktop it downloads the PDF and opens a prefilled draft.
+  async function handleEmail() {
+    setBusy("email");
+    try {
+      const file = await fetchPdfFile();
+      const clientEmail = clientEmailFor(inspection);
+      if (canShareFiles(file)) {
+        if (clientEmail) {
+          await navigator.clipboard?.writeText(clientEmail).catch(() => undefined);
+          toast.info(`Adresa klienta ${clientEmail} je skopírovaná — vložte ju do poľa „Komu“.`, { duration: 10000 });
+        }
+        await shareViaSheet(file);
+      } else {
+        downloadFile(file);
+        window.location.href = reportMailtoUrl(inspection);
+        toast.info("PDF bolo stiahnuté — priložte ho k pripravenému e-mailu.", { duration: 10000 });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Odoslanie e-mailu zlyhalo");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function handleComplete() {
     setBusy("complete");
@@ -134,6 +215,12 @@ export function StepExport() {
           </a>
           <Button variant="outline" onClick={() => window.open(pdfUrl, "_blank")?.print()}>
             <Printer /> Tlačiť
+          </Button>
+          <Button variant="outline" onClick={() => void handleEmail()} disabled={busy === "email"}>
+            <Mail /> {busy === "email" ? "Pripravujem…" : "Poslať e-mailom"}
+          </Button>
+          <Button variant="outline" onClick={() => void handleShare()} disabled={busy === "share"}>
+            <Share2 /> {busy === "share" ? "Pripravujem…" : "Zdieľať"}
           </Button>
         </div>
       </StepSection>
