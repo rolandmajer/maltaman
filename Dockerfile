@@ -52,8 +52,11 @@ ENV PATH="/app/node_modules/.bin:${PATH}"
 # merges the traced runtime node_modules on top without npm pruning either set.
 # `dotenv` backs prisma.config.ts's `import "dotenv/config"`; on Fly the real env
 # vars are injected by the platform, so it simply finds no .env and moves on.
-# Versions pinned to match package.json.
-RUN npm install --no-save prisma@7.9.0 dotenv@17.4.2
+# `tsx` + `bcryptjs` let the release command's `scripts/create-admin.ts` run inside the image
+# to bootstrap the first login — the app has no public sign-up and seeding is skipped in
+# production. bcryptjs is otherwise only bundled into the Next server chunks, so it must be
+# installed here too. Versions pinned to match package.json.
+RUN npm install --no-save prisma@7.9.0 dotenv@17.4.2 tsx@4.23.1 bcryptjs@3.0.3
 
 # `node:22` images already ship a non-root `node` user (uid 1000) — reuse it
 # instead of creating a new one.
@@ -66,6 +69,9 @@ COPY --from=builder --chown=node:node /app/prisma ./prisma
 # prisma.config.ts lives at the repo root, so it isn't part of /app/prisma above;
 # the CLI needs it alongside the schema to know the datasource URL for migrations.
 COPY --from=builder --chown=node:node /app/prisma.config.ts ./prisma.config.ts
+# Release-command scripts (migrations + admin bootstrap). create-admin.ts imports the generated
+# Prisma client from .next/standalone's src/generated/prisma, already copied above.
+COPY --from=builder --chown=node:node /app/scripts ./scripts
 
 USER node
 EXPOSE 3000

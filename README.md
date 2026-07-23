@@ -149,15 +149,32 @@ fly secrets set AUTH_SECRET="$(openssl rand -base64 32)"
 fly deploy
 ```
 
-`fly deploy` builds the Docker image, runs `prisma migrate deploy` via `release_command`
-(creating `/data/dev.db` on first run), then starts the app. Seeding is intentionally
-**not** automatic in production, since the seed script creates a technician account with a
-known demo password — if you want the demo data, run it manually once against the deployed
-volume:
+`fly deploy` builds the Docker image, runs the release command (`scripts/release.sh` — pending
+migrations, then the admin bootstrap below), then starts the app.
 
-```bash
-fly ssh console -C "npx tsx prisma/seed.ts"
-```
+**Creating your first login.** The app has no public sign-up, and seeding is intentionally
+**not** run in production (the seed creates a demo account with a known password *and* loads
+sample inspections). Instead, the release command bootstraps a real admin account from
+secrets — no SSH or terminal required, so it works entirely from the Fly.io dashboard:
+
+1. Set two secrets on the app (**Secrets** tab in the dashboard, or the CLI):
+
+   ```bash
+   fly secrets set ADMIN_EMAIL="you@example.com" ADMIN_PASSWORD="a-strong-password"
+   ```
+
+2. Deploy (or redeploy). On the next release, `scripts/create-admin.ts` runs and creates the
+   admin account. Then log in with that e-mail and password.
+
+The bootstrap is safe to leave in place: once the account exists it is **not** overwritten on
+later deploys, so a password you change inside the app sticks. To deliberately reset the
+password, set `ADMIN_FORCE_RESET=true` (plus a new `ADMIN_PASSWORD`) and redeploy, then unset
+it. If the secrets aren't set, the step simply no-ops.
+
+If you have the Fly CLI, you can also run it on demand without redeploying:
+`fly ssh console -C "tsx scripts/create-admin.ts"`. (The full `prisma/seed.ts` — which loads
+demo data — depends on dev-only sources that aren't in the slim runtime image, so it's for
+local development only, not production.)
 
 Subsequent deploys are just `fly deploy` again; migrations and data on the volume persist.
 
