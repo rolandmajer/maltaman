@@ -43,6 +43,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const isPublic =
         pathname === "/login" ||
         pathname.startsWith("/api/auth") ||
+        pathname.startsWith("/api/bootstrap-admin") ||
         pathname.startsWith("/manifest") ||
         pathname.startsWith("/icons") ||
         pathname === "/sw.js";

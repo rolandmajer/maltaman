@@ -51,11 +51,9 @@ ENV PATH="/app/node_modules/.bin:${PATH}"
 # Installed before the standalone copy below so Docker's COPY merges the traced
 # runtime node_modules on top without npm pruning either set. `dotenv` backs
 # prisma.config.ts's `import "dotenv/config"`; on Fly the real env vars are injected
-# by the platform, so it simply finds no .env and moves on. `tsx` + `bcryptjs` run
-# scripts/bootstrap-admin.ts at startup to create the first admin login (the app has no
-# public sign-up); bcryptjs is otherwise only bundled into the Next server chunks, so it
-# must be installed here too. Versions pinned to match package.json.
-RUN npm install --no-save prisma@7.9.0 dotenv@17.4.2 tsx@4.23.1 bcryptjs@3.0.3
+# by the platform, so it simply finds no .env and moves on. Versions pinned to match
+# package.json.
+RUN npm install --no-save prisma@7.9.0 dotenv@17.4.2
 
 # `node:22` images already ship a non-root `node` user (uid 1000) — reuse it
 # instead of creating a new one.
