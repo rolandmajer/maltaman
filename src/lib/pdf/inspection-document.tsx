@@ -423,18 +423,20 @@ function FindingsSummaryPage({ inspection, settings }: Props) {
 
   const roomNameById = new Map(inspection.rooms.map((r) => [r.id, r.name]));
   const roomDefects: SummaryDefectRow[] = inspection.rooms.flatMap((room) =>
-    room.elements.flatMap((element) =>
-      element.conditions
-        .filter((c) => c.includeInSummary)
-        .map((c) => ({
-          id: c.id,
-          status: element.status,
-          severity: c.severity,
-          label: element.label,
-          description: [c.location, c.note].filter(Boolean).join(" — ") || parseJsonStringArray(c.defectTypes).join(", "),
-          source: roomNameById.get(room.id) ?? "Miestnosť",
-        }))
-    )
+    room.elements
+      .filter((element) => element.status === "V" || element.status === "R")
+      .flatMap((element) =>
+        element.conditions
+          .filter((c) => c.includeInSummary)
+          .map((c) => ({
+            id: c.id,
+            status: element.status,
+            severity: c.severity,
+            label: element.label,
+            description: [c.location, c.note].filter(Boolean).join(" — ") || parseJsonStringArray(c.defectTypes).join(", "),
+            source: roomNameById.get(room.id) ?? "Miestnosť",
+          }))
+      )
   );
 
   const defects = [...legacyDefects, ...roomDefects];

@@ -314,7 +314,9 @@ export const costItemUpdateSchema = costItemSchema.partial();
 
 export const recommendationSchema = z.object({
   category: recommendationCategorySchema,
-  text: z.string().min(1),
+  // No min-length: a recommendation card is created as an empty placeholder first, then the
+  // technician fills in the text inline — same pattern as signatureSchema.fullName below.
+  text: z.string().optional().default(""),
   relatedRoomId: z.string().nullable().optional(),
   relatedFindingId: z.string().nullable().optional(),
   order: z.number().int().optional(),
