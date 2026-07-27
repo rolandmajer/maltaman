@@ -5,7 +5,7 @@ import { elementAttributeSchema } from "@/lib/validation";
 import { loadRoomElement } from "@/lib/room-element-service";
 
 /** Upserts one { attributeKey, value } pair — idempotent, matches the @@unique([roomElementId, attributeKey]) constraint. */
-export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string; roomId: string; elementId: string }> }) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string; roomId: string; elementId: string }> }) {
   try {
     const user = await requireSession();
     const { id, roomId, elementId } = await ctx.params;
