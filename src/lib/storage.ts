@@ -55,7 +55,12 @@ function createTigrisBackend(): StorageBackend {
       const res = await client.fetch(url(key), {
         method: "PUT",
         body: new Uint8Array(body),
-        headers: { "Content-Type": CONTENT_TYPE },
+        // aws4fetch signs the request via `new Request(url, { duplex: "half", ... })`, which on
+        // Node's undici suppresses automatic Content-Length computation for buffer bodies and
+        // falls back to chunked transfer — Tigris's S3-compatible endpoint rejects that with
+        // "411 MissingContentLength". Set it explicitly; it's excluded from SigV4 signing
+        // (UNSIGNABLE_HEADERS) so this doesn't affect the signature.
+        headers: { "Content-Type": CONTENT_TYPE, "Content-Length": String(body.byteLength) },
       });
       if (!res.ok) {
         throw new Error(`Tigris PUT ${key} failed: ${res.status} ${await res.text().catch(() => "")}`.trim());
