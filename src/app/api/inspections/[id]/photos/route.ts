@@ -40,7 +40,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const gpsLng = formData.get("gpsLng");
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const { storageKey, thumbnailKey } = await savePhotoFile(bytes);
+    let storageKey: string;
+    let thumbnailKey: string;
+    try {
+      ({ storageKey, thumbnailKey } = await savePhotoFile(bytes));
+    } catch (error) {
+      // Surface the real cause (Tigris/sharp) instead of a generic 500 — this app's operator
+      // debugs from the toast, not from server logs.
+      console.error("savePhotoFile failed:", error);
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new ApiError(502, `Uloženie fotografie do úložiska zlyhalo: ${detail}`);
+    }
 
     const maxOrder = await db.photo.aggregate({ where: { inspectionId: id }, _max: { order: true } });
     const existingCount = await db.photo.count({ where: { inspectionId: id } });

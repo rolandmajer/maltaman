@@ -27,7 +27,14 @@ export async function POST(req: NextRequest) {
     if (file.size > MAX_UPLOAD_BYTES) throw new ApiError(400, "Súbor je príliš veľký");
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const { storageKey } = await savePhotoFile(bytes);
+    let storageKey: string;
+    try {
+      ({ storageKey } = await savePhotoFile(bytes));
+    } catch (error) {
+      console.error("savePhotoFile failed:", error);
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new ApiError(502, `Uloženie loga do úložiska zlyhalo: ${detail}`);
+    }
 
     const updated = await db.appSettings.update({
       where: { organisationId: user.organisationId },

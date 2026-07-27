@@ -101,26 +101,32 @@ its findings/photos/cost items (the UI confirms before deleting anything non-emp
 ## Deploying to Fly.io
 
 Vercel/Netlify won't work for this app as-is: both run on an ephemeral, read-only
-filesystem, and this app stores its SQLite database file and uploaded photos on local disk.
-Fly.io supports persistent volumes on its free allowance, so the app can deploy there with
-**zero changes** to the SQLite/local-storage architecture. `Dockerfile`, `fly.toml`, and
-`.dockerignore` in the repo root implement this:
+filesystem, and this app keeps its SQLite database file on local disk. Fly.io supports
+persistent volumes on its free allowance, so the database can live on a volume, while
+uploaded photos go to **Tigris object storage** (S3-compatible, provisioned by Fly's Tigris
+extension). `Dockerfile`, `fly.toml`, and `.dockerignore` in the repo root implement this:
 
 - `Dockerfile` — multi-stage build. `deps` installs dependencies (with build tools, in case
   better-sqlite3/sharp need to compile native bindings for the target platform); `builder`
   runs `prisma generate` and `next build` (using `output: "standalone"` from
   `next.config.ts`, which traces only the files actually needed at runtime); `runner` is the
-  slim production image — it also globally installs the `prisma` CLI (not included in the
-  standalone trace, since it's a dev-time tool) so `prisma migrate deploy` can run at deploy
-  time.
-- `fly.toml` — mounts a persistent volume at `/data`, and points `DATABASE_URL` at
-  `file:/data/dev.db` and `STORAGE_DIR` at `/data/storage` so the database and photos survive
-  restarts and redeploys. `release_command = "prisma migrate deploy"` applies pending
-  migrations before each deploy is promoted.
+  slim production image — it also installs the `prisma` CLI locally (not included in the
+  standalone trace, since it's a dev-time tool). Its entrypoint is `scripts/start.sh`, which
+  runs `prisma migrate deploy` and then starts the server.
+- `fly.toml` — mounts a persistent volume at `/data` and points `DATABASE_URL` at
+  `file:/data/dev.db` so the database survives restarts and redeploys. Photo storage is
+  backed by Tigris: `src/lib/storage.ts` auto-selects the Tigris (S3) backend when
+  `BUCKET_NAME` + `AWS_*` credentials are present (Fly injects them as secrets), and falls
+  back to the local filesystem otherwise. There is deliberately **no** `release_command`:
+  migrations run at container startup instead, because Fly's release-command machine has no
+  volume mounted, so it can't migrate the real SQLite database — only the app machine (which
+  has the volume) can.
 
 **Important**: a Fly volume is pinned to a single machine, and SQLite is single-writer — do
 **not** scale this app beyond 1 machine (don't set `min_machines_running` above 1 or add
-`[[services]].concurrency`-based autoscaling that spins up parallel machines).
+`[[services]].concurrency`-based autoscaling that spins up parallel machines). (Photos now
+live in Tigris rather than on the volume, but the SQLite database still pins the app to one
+machine.)
 
 ### First-time setup
 
@@ -133,23 +139,45 @@ fly auth login
 fly launch --no-deploy --copy-config
 fly volumes create maltaman_data --size 1 --region fra
 
-# 3. Set secrets (never commit these — DATABASE_URL/STORAGE_DIR are already in fly.toml
+# 3. Provision a Tigris bucket for photo storage. This sets BUCKET_NAME + AWS_* secrets on
+# the app automatically. (Already have one? Skip this — re-running errors if it exists.)
+fly ext tigris create
+
+# 4. Set secrets (never commit these — DATABASE_URL/STORAGE_DIR are already in fly.toml
 # since they're just paths, not secrets)
 fly secrets set AUTH_SECRET="$(openssl rand -base64 32)"
 
-# 4. Deploy
+# 5. Deploy
 fly deploy
 ```
 
-`fly deploy` builds the Docker image, runs `prisma migrate deploy` via `release_command`
-(creating `/data/dev.db` on first run), then starts the app. Seeding is intentionally
-**not** automatic in production, since the seed script creates a technician account with a
-known demo password — if you want the demo data, run it manually once against the deployed
-volume:
+`fly deploy` builds the Docker image; on startup the app applies pending migrations to the
+volume database and then starts serving.
 
-```bash
-fly ssh console -C "npx tsx prisma/seed.ts"
-```
+**Creating your first login.** The app has no public sign-up, and seeding is intentionally
+**not** run in production (the seed creates a demo account with a known password *and* loads
+sample inspections). Instead, an admin account is created from secrets by a one-time setup
+endpoint that runs inside the app server — no SSH or terminal required:
+
+1. Set two secrets on the app (**Secrets** tab in the dashboard, or the CLI):
+
+   ```bash
+   fly secrets set ADMIN_EMAIL="you@example.com" ADMIN_PASSWORD="a-strong-password"
+   ```
+
+2. Deploy (or restart), then visit **`https://<your-app>.fly.dev/api/bootstrap-admin`** once.
+   It returns JSON such as `{"status":"created","message":"Created you@example.com …"}`. Then
+   log in with that e-mail and password.
+
+This runs `bootstrapAdmin()` (`src/lib/bootstrap-admin.ts`) using the app's own database
+connection — reachable before login because the route is allow-listed in `src/lib/auth.ts`. It's
+safe to expose: it only ever creates/updates the account defined by the server's `ADMIN_*`
+secrets (never anything from the request), and it no-ops once that account exists. To reset the
+password, set `ADMIN_FORCE_RESET=true` (plus a new `ADMIN_PASSWORD`), hit the endpoint again,
+then unset it. Once you've logged in, remove the `ADMIN_*` secrets and the endpoint goes inert.
+
+(The full `prisma/seed.ts` — which loads demo data — is for local development only, not
+production.)
 
 Subsequent deploys are just `fly deploy` again; migrations and data on the volume persist.
 

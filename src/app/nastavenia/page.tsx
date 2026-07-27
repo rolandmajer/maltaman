@@ -7,7 +7,7 @@ export default async function SettingsPage() {
   return (
     <>
       <AppHeader userName={session!.user.name ?? ""} backHref="/" />
-      <SettingsClient />
+      <SettingsClient isAdmin={session!.user.role === "ADMIN"} currentUserId={session!.user.id} />
     </>
   );
 }

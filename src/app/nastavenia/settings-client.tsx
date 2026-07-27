@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, Trash2, Upload } from "lucide-react";
+import { Plus, Trash2, Upload, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPatch, apiPost, apiUpload } from "@/lib/offline/api-client";
+import { apiGet, apiPatch, apiPost, apiDelete, apiUpload } from "@/lib/offline/api-client";
 import { useAutosaveForm } from "@/lib/use-autosave-form";
 import { appSettingsUpdateSchema } from "@/lib/validation";
 import { StepPageHeader, StepSection } from "@/components/wizard/step-section";
@@ -13,14 +13,32 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiDelete } from "@/lib/offline/api-client";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DEFAULT_COST_CATEGORIES } from "@/lib/constants";
 import type { z } from "zod";
 
 type SettingsValues = z.infer<typeof appSettingsUpdateSchema>;
 type SettingsResponse = SettingsValues & { logoUrl: string | null };
 
-export function SettingsClient() {
+export function SettingsClient({ isAdmin, currentUserId }: { isAdmin: boolean; currentUserId: string }) {
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
@@ -148,6 +166,10 @@ export function SettingsClient() {
       </StepSection>
 
       <PresetValuesSection />
+
+      <PasswordSection />
+
+      {isAdmin && <UsersSection currentUserId={currentUserId} />}
     </div>
   );
 }
@@ -249,6 +271,266 @@ function PresetValuesSection() {
         <Input value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder="Nová hodnota…" />
         <Button size="sm" variant="outline" onClick={() => void addValue()}>
           <Plus /> Pridať
+        </Button>
+      </div>
+    </StepSection>
+  );
+}
+
+function PasswordSection() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function changePassword() {
+    if (newPassword.length < 8) {
+      toast.error("Nové heslo musí mať aspoň 8 znakov");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Nové heslá sa nezhodujú");
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiPost("/api/account/password", { currentPassword, newPassword }, "Zmena hesla");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Heslo bolo zmenené");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Zmena hesla zlyhala");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <StepSection title="Zmena hesla" description="Zmena hesla pre váš vlastný účet.">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pw-current">Súčasné heslo</Label>
+          <Input
+            id="pw-current"
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pw-new">Nové heslo (min. 8 znakov)</Label>
+          <Input
+            id="pw-new"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pw-confirm">Nové heslo znova</Label>
+          <Input
+            id="pw-confirm"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+        </div>
+      </div>
+      <Button
+        size="sm"
+        className="mt-1 self-start"
+        onClick={() => void changePassword()}
+        disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+      >
+        {saving ? "Ukladám…" : "Zmeniť heslo"}
+      </Button>
+    </StepSection>
+  );
+}
+
+type UserRow = {
+  id: string;
+  name: string;
+  email: string;
+  role: "ADMIN" | "TECHNICIAN";
+  registrationNumber: string | null;
+  createdAt: string;
+};
+
+const ROLE_LABELS: Record<UserRow["role"], string> = { ADMIN: "Administrátor", TECHNICIAN: "Technik" };
+
+const EMPTY_NEW_USER = { name: "", email: "", password: "", role: "TECHNICIAN" as UserRow["role"], registrationNumber: "" };
+
+function UsersSection({ currentUserId }: { currentUserId: string }) {
+  const [users, setUsers] = useState<UserRow[] | null>(null);
+  const [newUser, setNewUser] = useState(EMPTY_NEW_USER);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    apiGet<UserRow[]>("/api/users")
+      .then(setUsers)
+      .catch(() => toast.error("Nepodarilo sa načítať používateľov"));
+  }, []);
+
+  async function addUser() {
+    if (!newUser.name.trim() || !newUser.email.trim()) {
+      toast.error("Zadajte meno a e-mail");
+      return;
+    }
+    if (newUser.password.length < 8) {
+      toast.error("Heslo musí mať aspoň 8 znakov");
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await apiPost<UserRow>(
+        "/api/users",
+        {
+          name: newUser.name,
+          email: newUser.email,
+          password: newUser.password,
+          role: newUser.role,
+          registrationNumber: newUser.registrationNumber || undefined,
+        },
+        "Vytvorenie používateľa"
+      );
+      setUsers((prev) => [...(prev ?? []), created]);
+      setNewUser(EMPTY_NEW_USER);
+      toast.success(`Používateľ ${created.email} bol vytvorený`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Vytvorenie používateľa zlyhalo");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteUser(user: UserRow) {
+    try {
+      await apiDelete(`/api/users/${user.id}`, "Odstránenie používateľa");
+      setUsers((prev) => (prev ?? []).filter((u) => u.id !== user.id));
+      toast.success(`Používateľ ${user.email} bol odstránený`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Odstránenie používateľa zlyhalo");
+    }
+  }
+
+  return (
+    <StepSection
+      title="Používatelia"
+      description="Účty pre prihlásenie do aplikácie. Noví používatelia sa prihlásia zadaným e-mailom a heslom."
+    >
+      {users === null ? (
+        <p className="text-sm text-slate-400">Načítavam používateľov…</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {users.map((user) => (
+            <li
+              key={user.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm"
+            >
+              <div className="min-w-0">
+                <p className="font-medium">
+                  {user.name}
+                  {user.id === currentUserId && <span className="ml-1 text-xs text-slate-400">(vy)</span>}
+                </p>
+                <p className="truncate text-xs text-slate-500">
+                  {user.email}
+                  {user.registrationNumber ? ` · ${user.registrationNumber}` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>{ROLE_LABELS[user.role]}</Badge>
+                {user.id !== currentUserId && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button type="button" aria-label={`Odstrániť používateľa ${user.email}`}>
+                        <Trash2 className="size-4 text-red-500" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Odstrániť používateľa?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Účet {user.email} sa natrvalo odstráni a používateľ sa už neprihlási. Používateľa s
+                          vytvorenými obhliadkami nie je možné odstrániť.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Zrušiť</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => void deleteUser(user)}>Odstrániť</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-2 rounded-lg border border-slate-200 p-3">
+        <p className="mb-3 text-sm font-medium">Pridať používateľa</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="new-user-name">Meno</Label>
+            <Input
+              id="new-user-name"
+              value={newUser.name}
+              onChange={(e) => setNewUser((p) => ({ ...p, name: e.target.value }))}
+              autoComplete="off"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="new-user-email">E-mail</Label>
+            <Input
+              id="new-user-email"
+              type="email"
+              value={newUser.email}
+              onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))}
+              autoComplete="off"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="new-user-password">Heslo (min. 8 znakov)</Label>
+            <Input
+              id="new-user-password"
+              type="password"
+              value={newUser.password}
+              onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="new-user-role">Rola</Label>
+            <Select
+              value={newUser.role}
+              onValueChange={(role) => setNewUser((p) => ({ ...p, role: role as UserRow["role"] }))}
+            >
+              <SelectTrigger id="new-user-role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TECHNICIAN">Technik</SelectItem>
+                <SelectItem value="ADMIN">Administrátor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label htmlFor="new-user-reg">Číslo osvedčenia (nepovinné)</Label>
+            <Input
+              id="new-user-reg"
+              value={newUser.registrationNumber}
+              onChange={(e) => setNewUser((p) => ({ ...p, registrationNumber: e.target.value }))}
+              autoComplete="off"
+            />
+          </div>
+        </div>
+        <Button size="sm" className="mt-3" onClick={() => void addUser()} disabled={saving}>
+          <UserPlus /> {saving ? "Vytváram…" : "Pridať používateľa"}
         </Button>
       </div>
     </StepSection>

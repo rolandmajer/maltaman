@@ -19,6 +19,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@flydotio/litestream": "^1.0.1",
     "@hookform/resolvers": "^5.4.0",
     "@prisma/adapter-better-sqlite3": "^7.9.0",
     "@prisma/client": "^7.9.0",
@@ -39,6 +40,7 @@
     "@radix-ui/react-tabs": "^1.1.19",
     "@radix-ui/react-toast": "^1.2.21",
     "@react-pdf/renderer": "^4.5.1",
+    "aws4fetch": "^1.0.20",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.1",
     "class-variance-authority": "^0.7.1",
@@ -98,5 +100,8 @@
     "sharp@0.35.3": true,
     "prisma@7.9.0": true,
     "unrs-resolver@1.12.2": true
+  },
+  "dockerfile": {
+    "litestream": true
   }
 }
