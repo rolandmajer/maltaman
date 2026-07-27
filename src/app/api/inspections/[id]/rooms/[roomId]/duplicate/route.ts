@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireInspectionAccess, requireSession, jsonError, ApiError } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
+import { copyRoomElementsDeep } from "@/lib/room-element-service";
 
-/** Duplicates a room along with its findings/measurements/cost items so similar bedrooms can be added quickly. */
+/** Duplicates a room along with its element/attribute/condition/measurement/photo tree so similar bedrooms can be added quickly. */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string; roomId: string }> }) {
   try {
     const user = await requireSession();
@@ -12,8 +13,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const source = await db.room.findUnique({
       where: { id: roomId },
       include: {
-        findings: { include: { measurements: true } },
-        costItems: true,
+        elements: {
+          orderBy: { order: "asc" },
+          include: { attributes: true, conditions: { orderBy: { order: "asc" }, include: { measurements: true, photos: true } } },
+        },
       },
     });
     if (!source || source.inspectionId !== id) throw new ApiError(404, "Miestnosť nebola nájdená");
@@ -41,66 +44,23 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         },
       });
 
-      for (const finding of source.findings) {
-        await tx.finding.create({
-          data: {
-            inspectionId: id,
-            roomId: room.id,
-            checklistKey: finding.checklistKey,
-            label: finding.label,
-            status: finding.status,
-            description: finding.description,
-            severity: finding.severity,
-            location: finding.location,
-            recommendedAction: finding.recommendedAction,
-            recommendedSpecialist: finding.recommendedSpecialist,
-            urgency: finding.urgency,
-            isPositiveObservation: finding.isPositiveObservation,
-            includeInSummary: finding.includeInSummary,
-            order: finding.order,
-            measurements: {
-              create: finding.measurements.map((m) => ({
-                label: m.label,
-                value: m.value,
-                unit: m.unit,
-                note: m.note,
-                order: m.order,
-              })),
+      await copyRoomElementsDeep(tx, source, room.id, id, { copyPhotos: true });
+
+      return tx.room.findUnique({
+        where: { id: room.id },
+        include: {
+          elements: {
+            orderBy: { order: "asc" },
+            include: {
+              attributes: true,
+              conditions: { orderBy: { order: "asc" }, include: { measurements: true, photos: true, costItems: true } },
+              photos: true,
+              costItems: true,
             },
           },
-        });
-      }
-
-      for (const costItem of source.costItems) {
-        await tx.costItem.create({
-          data: {
-            inspectionId: id,
-            categoryId: costItem.categoryId,
-            roomId: room.id,
-            name: costItem.name,
-            description: costItem.description,
-            quantity: costItem.quantity,
-            unit: costItem.unit,
-            unitPrice: costItem.unitPrice,
-            laborCost: costItem.laborCost,
-            materialCost: costItem.materialCost,
-            otherCost: costItem.otherCost,
-            vatRatePercent: costItem.vatRatePercent,
-            minEstimate: costItem.minEstimate,
-            expectedEstimate: costItem.expectedEstimate,
-            maxEstimate: costItem.maxEstimate,
-            priority: costItem.priority,
-            completionHorizon: costItem.completionHorizon,
-            supplier: costItem.supplier,
-            source: costItem.source,
-            notes: costItem.notes,
-            included: costItem.included,
-            order: costItem.order,
-          },
-        });
-      }
-
-      return tx.room.findUnique({ where: { id: room.id }, include: { findings: true, costItems: true } });
+          costItems: true,
+        },
+      });
     });
 
     return NextResponse.json(duplicated, { status: 201 });

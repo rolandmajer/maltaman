@@ -21,9 +21,10 @@ model Organisation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users       User[]
-  inspections Inspection[]
-  settings    AppSettings?
+  users              User[]
+  inspections        Inspection[]
+  settings           AppSettings?
+  customPresetValues CustomPresetValue[]
 }
 
 enum UserRole {
@@ -251,12 +252,145 @@ model Room {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  findings        Finding[]
+  elements        RoomElement[]
   photos          Photo[]
   costItems       CostItem[]
   recommendations Recommendation[]
+  findings        Finding[]
 
   @@index([inspectionId])
+}
+
+// ---------------------------------------------------------------------------
+// Room elements — structured replacement for the flat room checklist.
+// A RoomElement holds ONE status per element instance (rooms can have several
+// instances of the same elementKey, e.g. "Okno 1"/"Okno 2" — allowMultiple in
+// ROOM_ELEMENT_ADDITIONAL_CONFIG). Structured type/material info lives in
+// ElementAttribute (EAV rows); unlimited free-form condition entries live in
+// ElementCondition. Kept fully separate from `Finding`, which continues to
+// serve only the Technický stav step and ad-hoc findings.
+// ---------------------------------------------------------------------------
+
+enum ElementStatus {
+  OK
+  V // vada
+  R // riziko
+  N // neposudzované / neprístupné (naReason required)
+  NEVZTAHUJE_SA // not applicable
+}
+
+enum ElementNAReason {
+  NEPRISTUPNE
+  ZAKRYTE_NABYTKOM
+  ZAKRYTE_KONSTRUKCIOU
+  NEBOLO_MOZNE_BEZPECNE_POSUDIT
+  MIMO_ROZSAHU_OBHLIADKY
+  FUNKCNOST_NEBOLO_MOZNE_OVERIT
+  INY_DOVOD
+}
+
+enum ConditionDeadline {
+  OKAMZITE
+  DO_1_MESIACA
+  DO_3_MESIACOV
+  DO_1_ROKA
+  PRI_NAJBLIZSEJ_REKONSTRUKCII
+  SLEDOVAT
+  NIE_JE_POTREBNY
+}
+
+model RoomElement {
+  id     String @id @default(cuid())
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  elementKey String // stable key from ROOM_CHECKLIST_ITEMS, e.g. "okna" — not unique per room
+  label      String // defaults to the catalog label; editable per-instance ("Okno 1"/"Okno 2")
+
+  status       ElementStatus    @default(OK)
+  naReason     ElementNAReason?
+  naReasonNote String           @default("") // free text for INY_DOVOD
+
+  description         String  @default("") // auto-generated Slovak sentence, editable
+  descriptionIsManual Boolean @default(false) // set true on first manual edit; gates auto-regeneration
+
+  order Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attributes ElementAttribute[]
+  conditions ElementCondition[]
+  photos     Photo[]
+  costItems  CostItem[]
+
+  @@index([roomId])
+  @@index([roomId, elementKey])
+}
+
+model ElementAttribute {
+  id            String      @id @default(cuid())
+  roomElementId String
+  roomElement   RoomElement @relation(fields: [roomElementId], references: [id], onDelete: Cascade)
+
+  attributeKey String // key into ROOM_ELEMENT_ADDITIONAL_CONFIG[elementKey].attributes, e.g. "typ_podlahy"
+  value        String // single value, or JSON-encoded string[] when the field is multiSelect
+
+  @@unique([roomElementId, attributeKey])
+  @@index([roomElementId])
+}
+
+model ElementCondition {
+  id            String      @id @default(cuid())
+  roomElementId String
+  roomElement   RoomElement @relation(fields: [roomElementId], references: [id], onDelete: Cascade)
+
+  defectTypes String @default("[]") // JSON string[] — "Typ stavu/poškodenia" multi-select
+
+  location          String             @default("") // "Presné umiestnenie"
+  extent            String             @default("") // "Rozsah"
+  severity          FindingSeverity?
+  cause             String             @default("") // "Predpokladaná príčina"
+  recommendedAction String             @default("")
+  deadline          ConditionDeadline?
+
+  note String @default("") // additional free-text note
+
+  includeInSummary  Boolean @default(true) // mark for executive summary
+  excludeFromReport Boolean @default(false)
+  order             Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  measurements Measurement[]
+  photos       Photo[]
+  costItems    CostItem[]
+
+  @@index([roomElementId])
+}
+
+// ---------------------------------------------------------------------------
+// Org-level custom preset values — backs the "remember recently used / custom
+// values / editable in Settings" behaviour for every searchable dropdown
+// introduced by the room-element system. `category` namespaces the vocabulary,
+// e.g. "location", "extent", "element-attribute:okna:material_ramu".
+// ---------------------------------------------------------------------------
+
+model CustomPresetValue {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  category String
+  value    String
+
+  usageCount Int      @default(0)
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([organisationId, category, value])
+  @@index([organisationId, category, lastUsedAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -362,9 +496,12 @@ model Finding {
 }
 
 model Measurement {
-  id        String  @id @default(cuid())
-  findingId String
-  finding   Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  findingId String?
+  finding   Finding? @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  elementConditionId String?
+  elementCondition   ElementCondition? @relation(fields: [elementConditionId], references: [id], onDelete: Cascade)
 
   label String
   value Float
@@ -373,6 +510,7 @@ model Measurement {
   order Int    @default(0)
 
   @@index([findingId])
+  @@index([elementConditionId])
 }
 
 // ---------------------------------------------------------------------------
@@ -390,6 +528,11 @@ model Photo {
   finding   Finding?           @relation(fields: [findingId], references: [id], onDelete: Cascade)
   elementId String?
   element   InspectionElement? @relation(fields: [elementId], references: [id], onDelete: Cascade)
+
+  roomElementId      String?
+  roomElement        RoomElement?      @relation(fields: [roomElementId], references: [id], onDelete: Cascade)
+  elementConditionId String?
+  elementCondition   ElementCondition? @relation(fields: [elementConditionId], references: [id], onDelete: Cascade)
 
   storageKey        String // path within private storage dir
   thumbnailKey      String?
@@ -410,6 +553,8 @@ model Photo {
   @@index([roomId])
   @@index([findingId])
   @@index([elementId])
+  @@index([roomElementId])
+  @@index([elementConditionId])
 }
 
 // ---------------------------------------------------------------------------
@@ -458,6 +603,11 @@ model CostItem {
   elementId String?
   element   InspectionElement? @relation(fields: [elementId], references: [id], onDelete: SetNull)
 
+  roomElementId      String?
+  roomElement        RoomElement?      @relation(fields: [roomElementId], references: [id], onDelete: SetNull)
+  elementConditionId String?
+  elementCondition   ElementCondition? @relation(fields: [elementConditionId], references: [id], onDelete: SetNull)
+
   name        String
   description String @default("")
 
@@ -491,6 +641,8 @@ model CostItem {
   @@index([roomId])
   @@index([findingId])
   @@index([elementId])
+  @@index([roomElementId])
+  @@index([elementConditionId])
 }
 
 // ---------------------------------------------------------------------------

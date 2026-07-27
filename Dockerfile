@@ -45,6 +45,15 @@ ENV HOSTNAME=0.0.0.0
 # `release_command`. Version pinned to match package.json's devDependency.
 RUN npm install --global prisma@7.9.0
 
+# prisma.config.ts imports "dotenv/config" and "prisma/config" — devDependencies Next's
+# standalone trace doesn't bundle (it only traces the app's own runtime code). The global
+# `prisma` install above puts the CLI binary on PATH, but Node still resolves prisma.config.ts's
+# own bare-specifier imports relative to /app/node_modules, not the global npm prefix — so both
+# packages also need a local (non-global, no-save) install here for the config file to load.
+# No .env exists in this image; dotenv is a no-op here since Fly injects env vars/secrets
+# directly — this only satisfies the import.
+RUN npm install --no-save prisma@7.9.0 dotenv@^17.4.2
+
 # `node:22` images already ship a non-root `node` user (uid 1000) — reuse it
 # instead of creating a new one.
 RUN mkdir -p /data && chown -R node:node /app /data

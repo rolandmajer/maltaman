@@ -3,7 +3,9 @@ import bcrypt from "bcryptjs";
 import sharp from "sharp";
 import { db } from "../src/lib/db";
 import { createInspection } from "../src/lib/inspection-service";
+import { seedRoomElements } from "../src/lib/room-element-service";
 import { DEFAULT_COST_CATEGORIES } from "../src/lib/constants";
+import { generateElementDescription } from "../src/lib/element-description";
 import { savePhotoFile } from "../src/lib/storage";
 
 async function placeholderPhoto(label: string, color: string) {
@@ -175,7 +177,27 @@ async function main() {
     ],
   });
 
-  console.log("Creating rooms with checklist findings...");
+  console.log("Creating rooms with structured room-element checklists...");
+
+  type ConditionOverride = {
+    defectTypes: string[];
+    location?: string;
+    extent?: string;
+    severity?: "KRITICKA" | "ZAVAZNA" | "STREDNA" | "DROBNA" | "INFORMATIVNA";
+    cause?: string;
+    recommendedAction?: string;
+    deadline?: "OKAMZITE" | "DO_1_MESIACA" | "DO_3_MESIACOV" | "DO_1_ROKA" | "PRI_NAJBLIZSEJ_REKONSTRUKCII" | "SLEDOVAT" | "NIE_JE_POTREBNY";
+    note?: string;
+  };
+
+  type ElementOverride = {
+    elementKey: string;
+    status?: "OK" | "V" | "R" | "N" | "NEVZTAHUJE_SA";
+    naReason?: "NEPRISTUPNE" | "ZAKRYTE_NABYTKOM" | "ZAKRYTE_KONSTRUKCIOU" | "NEBOLO_MOZNE_BEZPECNE_POSUDIT" | "MIMO_ROZSAHU_OBHLIADKY" | "FUNKCNOST_NEBOLO_MOZNE_OVERIT" | "INY_DOVOD";
+    naReasonNote?: string;
+    attributes?: Record<string, string>;
+    conditions?: ConditionOverride[];
+  };
 
   const roomsData: {
     name: string;
@@ -183,7 +205,7 @@ async function main() {
     lengthM: number;
     widthM: number;
     heightM: number;
-    findings: { checklistKey: string; label: string; status: "OK" | "V" | "R" | "N"; description?: string; severity?: string }[];
+    elements?: ElementOverride[];
   }[] = [
     {
       name: "Obývacia izba",
@@ -191,22 +213,61 @@ async function main() {
       lengthM: 5.2,
       widthM: 4.1,
       heightM: 2.6,
-      findings: [
-        { checklistKey: "podlaha", label: "Podlaha", status: "OK" },
+      elements: [
         {
-          checklistKey: "steny",
-          label: "Steny",
+          // The spec's worked example: two separate, structured condition entries synthesized
+          // into one auto-generated description, rather than a single free-text finding.
+          elementKey: "podlaha",
           status: "V",
-          description: "Viditeľná trhlina cca 40 cm dĺžky pri okne, pravdepodobne od sadania stavby.",
-          severity: "STREDNA",
+          attributes: { typ_podlahy: "Laminátová", sposob_ulozenia: "Plávajúca" },
+          conditions: [
+            {
+              defectTypes: ["Škáry"],
+              location: "Pri vstupe",
+              extent: "Lokálne",
+              severity: "DROBNA",
+              cause: "Mechanické opotrebenie",
+              recommendedAction: "Sledovať vývoj",
+              deadline: "SLEDOVAT",
+              note: "Lokálne poškriabaná pri vstupe.",
+            },
+            {
+              defectTypes: ["Stopy vlhkosti"],
+              location: "Pri balkónových dverách",
+              extent: "0,1–0,5 m²",
+              severity: "STREDNA",
+              cause: "Pravdepodobný kondenz alebo drobné zatekanie",
+              recommendedAction: "Posúdenie vlhkosti",
+              deadline: "DO_1_MESIACA",
+              note: "So stopami vlhkosti pri balkónových dverách.",
+            },
+          ],
         },
-        { checklistKey: "strop", label: "Strop", status: "OK" },
-        { checklistKey: "okna", label: "Okná", status: "OK", description: "Plastové okná, rok výmeny 2015, tesnenia funkčné." },
-        { checklistKey: "dvere", label: "Dvere", status: "OK" },
-        { checklistKey: "elektroinstalacia", label: "Elektroinštalácia", status: "OK" },
-        { checklistKey: "osvetlenie", label: "Osvetlenie", status: "OK" },
-        { checklistKey: "vykurovanie", label: "Vykurovanie", status: "OK" },
-        { checklistKey: "vlhkost", label: "Vlhkosť", status: "OK" },
+        {
+          elementKey: "steny",
+          status: "V",
+          attributes: { konstrukcia: "Tehlové murivo", povrchova_uprava: "Maľovka" },
+          conditions: [
+            {
+              defectTypes: ["Výrazná trhlina"],
+              location: "Pri okne",
+              extent: "Lokálne",
+              severity: "STREDNA",
+              cause: "Pravdepodobne sadanie stavby",
+              recommendedAction: "Lokálne opraviť",
+              deadline: "DO_3_MESIACOV",
+              note: "Viditeľná trhlina cca 40 cm dĺžky pri okne, pravdepodobne od sadania stavby.",
+            },
+          ],
+        },
+        { elementKey: "strop", status: "OK", attributes: { typ_stropu: "Omietaný strop" } },
+        { elementKey: "okna", status: "OK", attributes: { material_ramu: "Plast", zasklenie: "Dvojsklo" } },
+        { elementKey: "dvere", status: "OK", attributes: { typ_dveri: "Interiérové otočné", material_dveri: "Drevo" } },
+        { elementKey: "elektroinstalacia", status: "OK", attributes: { revizna_sprava: "Predložená" } },
+        { elementKey: "osvetlenie", status: "OK" },
+        { elementKey: "vykurovanie", status: "OK", attributes: { system_vykurovania: "Centrálne" } },
+        { elementKey: "chladenie", status: "NEVZTAHUJE_SA" },
+        { elementKey: "vlhkost", status: "OK" },
       ],
     },
     {
@@ -215,15 +276,16 @@ async function main() {
       lengthM: 3.6,
       widthM: 3.2,
       heightM: 2.6,
-      findings: [
-        { checklistKey: "podlaha", label: "Podlaha", status: "OK" },
-        { checklistKey: "steny", label: "Steny", status: "OK" },
-        { checklistKey: "okna", label: "Okná", status: "OK" },
+      elements: [
+        { elementKey: "podlaha", status: "OK", attributes: { typ_podlahy: "Laminátová" } },
+        { elementKey: "steny", status: "OK" },
+        { elementKey: "okna", status: "OK" },
+        { elementKey: "chladenie", status: "NEVZTAHUJE_SA" },
         {
-          checklistKey: "vlhkost",
-          label: "Vlhkosť",
+          elementKey: "vlhkost",
           status: "N",
-          description: "Roh za skriňou neprístupný pre nábytok.",
+          naReason: "ZAKRYTE_NABYTKOM",
+          naReasonNote: "Roh za veľkou skriňou neprístupný pre nábytok.",
         },
       ],
     },
@@ -233,11 +295,12 @@ async function main() {
       lengthM: 3.4,
       widthM: 3.0,
       heightM: 2.6,
-      findings: [
-        { checklistKey: "podlaha", label: "Podlaha", status: "OK" },
-        { checklistKey: "steny", label: "Steny", status: "OK" },
-        { checklistKey: "okna", label: "Okná", status: "OK" },
-        { checklistKey: "elektroinstalacia", label: "Elektroinštalácia", status: "OK" },
+      elements: [
+        { elementKey: "podlaha", status: "OK" },
+        { elementKey: "steny", status: "OK" },
+        { elementKey: "okna", status: "OK" },
+        { elementKey: "elektroinstalacia", status: "OK" },
+        { elementKey: "chladenie", status: "NEVZTAHUJE_SA" },
       ],
     },
     {
@@ -246,16 +309,26 @@ async function main() {
       lengthM: 3.0,
       widthM: 2.8,
       heightM: 2.6,
-      findings: [
-        { checklistKey: "podlaha", label: "Podlaha", status: "OK" },
+      elements: [
+        { elementKey: "podlaha", status: "OK" },
         {
-          checklistKey: "steny",
-          label: "Steny",
+          elementKey: "steny",
           status: "V",
-          description: "Odlupujúca sa maľovka pri parapete, pravdepodobne od príležitostného kondenzu.",
-          severity: "DROBNA",
+          conditions: [
+            {
+              defectTypes: ["Odlupovanie"],
+              location: "Pri okne",
+              extent: "Bodové",
+              severity: "DROBNA",
+              cause: "Príležitostný kondenz",
+              recommendedAction: "Vyčistiť",
+              deadline: "SLEDOVAT",
+              note: "Odlupujúca sa maľovka pri parapete, pravdepodobne od príležitostného kondenzu.",
+            },
+          ],
         },
-        { checklistKey: "okna", label: "Okná", status: "OK" },
+        { elementKey: "okna", status: "OK" },
+        { elementKey: "chladenie", status: "NEVZTAHUJE_SA" },
       ],
     },
     {
@@ -264,18 +337,28 @@ async function main() {
       lengthM: 3.8,
       widthM: 2.9,
       heightM: 2.6,
-      findings: [
-        { checklistKey: "podlaha", label: "Podlaha", status: "OK" },
-        { checklistKey: "steny", label: "Steny", status: "OK" },
+      elements: [
+        { elementKey: "podlaha", status: "OK", attributes: { typ_podlahy: "Keramická dlažba" } },
+        { elementKey: "steny", status: "OK" },
         {
-          checklistKey: "voda_odpady",
-          label: "Voda a odpady",
+          elementKey: "voda_odpady",
           status: "V",
-          description: "Mierne skorodované pripojenie pod drezom, badateľné stopy po staršom presakovaní.",
-          severity: "STREDNA",
+          attributes: { privod_vody: "Studená aj teplá voda", material_potrubia: "Meď" },
+          conditions: [
+            {
+              defectTypes: ["Korózia"],
+              location: "Pod nábytkom",
+              extent: "Bodové",
+              severity: "STREDNA",
+              cause: "Staršie presakovanie",
+              recommendedAction: "Vymeniť poškodenú časť",
+              deadline: "DO_3_MESIACOV",
+              note: "Mierne skorodované pripojenie pod drezom, badateľné stopy po staršom presakovaní.",
+            },
+          ],
         },
-        { checklistKey: "elektroinstalacia", label: "Elektroinštalácia", status: "OK" },
-        { checklistKey: "vetranie", label: "Vetranie", status: "OK", description: "Digestor funkčný, odvetranie do fasády." },
+        { elementKey: "elektroinstalacia", status: "OK" },
+        { elementKey: "vetranie", status: "OK", attributes: { typ_vetrania: "Odsávací ventilátor" } },
       ],
     },
     {
@@ -284,24 +367,42 @@ async function main() {
       lengthM: 2.4,
       widthM: 1.8,
       heightM: 2.6,
-      findings: [
+      elements: [
         {
-          checklistKey: "vlhkost",
-          label: "Vlhkosť",
+          elementKey: "vlhkost",
           status: "R",
-          description: "Zvýšená vlhkosť nameraná pri rohu vane (18 %), odporúčame odborné posúdenie hydroizolácie.",
-          severity: "ZAVAZNA",
+          conditions: [
+            {
+              defectTypes: ["Meraním potvrdená vlhkosť"],
+              location: "Pri podlahe",
+              extent: "0,5–1 m²",
+              severity: "ZAVAZNA",
+              cause: "Nezistená príčina, podozrenie na hydroizoláciu",
+              recommendedAction: "Zabezpečiť odborné meranie",
+              deadline: "DO_1_MESIACA",
+              note: "Zvýšená vlhkosť nameraná pri rohu vane, odporúčame odborné posúdenie hydroizolácie.",
+            },
+          ],
         },
         {
-          checklistKey: "plesen",
-          label: "Viditeľná pleseň",
+          elementKey: "plesen",
           status: "V",
-          description: "Drobné ložiská plesne v škárach obkladu pri vani.",
-          severity: "STREDNA",
+          conditions: [
+            {
+              defectTypes: ["Lokálny výskyt"],
+              location: "Kúpeľňa alebo mokrá zóna",
+              extent: "Do 0,1 m²",
+              severity: "STREDNA",
+              cause: "Nedostatočné vetranie",
+              recommendedAction: "Sanácia plesne v škárach obkladu",
+              deadline: "DO_3_MESIACOV",
+              note: "Drobné ložiská plesne v škárach obkladu pri vani.",
+            },
+          ],
         },
-        { checklistKey: "sanita", label: "Sanita", status: "OK" },
-        { checklistKey: "voda_odpady", label: "Voda a odpady", status: "OK" },
-        { checklistKey: "vetranie", label: "Vetranie", status: "OK" },
+        { elementKey: "sanita", status: "OK", attributes: { typ_prvku_sanita: "Vaňa", material_sanita: "Akrylát" } },
+        { elementKey: "voda_odpady", status: "OK" },
+        { elementKey: "vetranie", status: "OK", attributes: { typ_vetrania: "Odsávací ventilátor" } },
       ],
     },
     {
@@ -310,9 +411,9 @@ async function main() {
       lengthM: 1.2,
       widthM: 0.9,
       heightM: 2.6,
-      findings: [
-        { checklistKey: "sanita", label: "Sanita", status: "OK" },
-        { checklistKey: "podlaha", label: "Podlaha", status: "OK" },
+      elements: [
+        { elementKey: "sanita", status: "OK", attributes: { typ_prvku_sanita: "WC" } },
+        { elementKey: "podlaha", status: "OK" },
       ],
     },
     {
@@ -321,9 +422,10 @@ async function main() {
       lengthM: 4.5,
       widthM: 1.4,
       heightM: 2.6,
-      findings: [
-        { checklistKey: "podlaha", label: "Podlaha", status: "OK" },
-        { checklistKey: "elektroinstalacia", label: "Elektroinštalácia", status: "OK" },
+      elements: [
+        { elementKey: "podlaha", status: "OK" },
+        { elementKey: "elektroinstalacia", status: "OK" },
+        { elementKey: "chladenie", status: "NEVZTAHUJE_SA" },
       ],
     },
     {
@@ -332,21 +434,36 @@ async function main() {
       lengthM: 3.0,
       widthM: 1.2,
       heightM: 0,
-      findings: [
+      elements: [
         {
-          checklistKey: "ine",
-          label: "Zábradlie a kotvenie",
+          elementKey: "ine",
           status: "V",
-          description: "Skorodované kotvenie zábradlia, odporúčame kontrolu statikom pred ďalším používaním.",
-          severity: "ZAVAZNA",
+          conditions: [
+            {
+              defectTypes: ["Korózia"],
+              location: "Iné – doplniť",
+              extent: "Lokálne",
+              severity: "ZAVAZNA",
+              cause: "Dlhodobé pôsobenie poveternostných vplyvov",
+              recommendedAction: "Statické posúdenie",
+              deadline: "OKAMZITE",
+              note: "Skorodované kotvenie zábradlia, odporúčame kontrolu statikom pred ďalším používaním.",
+            },
+          ],
         },
-        { checklistKey: "ine", label: "Dlažba a izolácia", status: "OK" },
+        { elementKey: "vykurovanie", status: "NEVZTAHUJE_SA" },
+        { elementKey: "chladenie", status: "NEVZTAHUJE_SA" },
+        { elementKey: "vlhkost", status: "NEVZTAHUJE_SA" },
       ],
     },
   ];
 
   const roomIdByName = new Map<string, string>();
-  const findingIdByKey = new Map<string, string>();
+  // Keyed "<room name>:<elementKey>" / "<room name>:<elementKey>:<condition index>" — lets
+  // photoDefs/costItems below attach to a specific RoomElement/ElementCondition, demonstrating
+  // the "grouped under the correct condition" PDF requirement rather than only room-level tagging.
+  const elementIdByKey = new Map<string, string>();
+  const conditionIdByKey = new Map<string, string>();
 
   for (let i = 0; i < roomsData.length; i++) {
     const r = roomsData[i];
@@ -366,43 +483,82 @@ async function main() {
     });
     roomIdByName.set(r.name, room.id);
 
-    for (let j = 0; j < r.findings.length; j++) {
-      const f = r.findings[j];
-      const finding = await db.finding.create({
+    // Seeds the full 19-21 element catalog at status OK (wet-room gating handled internally),
+    // exactly like the room-creation API route does — then the loop below applies this room's
+    // specific overrides on top.
+    await seedRoomElements(db, room.id, r.type);
+    const seededElements = await db.roomElement.findMany({ where: { roomId: room.id } });
+
+    for (const override of r.elements ?? []) {
+      const element = seededElements.find((e) => e.elementKey === override.elementKey);
+      if (!element) continue;
+      elementIdByKey.set(`${r.name}:${override.elementKey}`, element.id);
+
+      const attributeEntries = Object.entries(override.attributes ?? {});
+      if (attributeEntries.length > 0) {
+        await db.elementAttribute.createMany({
+          data: attributeEntries.map(([attributeKey, value]) => ({ roomElementId: element.id, attributeKey, value })),
+        });
+      }
+
+      const description = generateElementDescription(
+        override.elementKey,
+        attributeEntries.map(([attributeKey, value]) => ({ attributeKey, value })),
+        (override.conditions ?? []).map((c) => ({ defectTypes: JSON.stringify(c.defectTypes), location: c.location ?? "", extent: c.extent ?? "" }))
+      );
+
+      await db.roomElement.update({
+        where: { id: element.id },
         data: {
-          inspectionId: inspection.id,
-          roomId: room.id,
-          checklistKey: f.checklistKey,
-          label: f.label,
-          status: f.status,
-          description: f.description ?? "",
-          severity: (f.severity as never) ?? null,
-          order: j,
-          urgency: f.status === "R" ? "WITHIN_3_MONTHS" : f.status === "V" ? "WITHIN_1_YEAR" : null,
+          status: override.status ?? "OK",
+          naReason: override.naReason ?? null,
+          naReasonNote: override.naReasonNote ?? "",
+          description,
+          descriptionIsManual: false,
         },
       });
-      findingIdByKey.set(`${r.name}:${f.checklistKey}`, finding.id);
+
+      for (let k = 0; k < (override.conditions ?? []).length; k++) {
+        const c = override.conditions![k];
+        const condition = await db.elementCondition.create({
+          data: {
+            roomElementId: element.id,
+            defectTypes: JSON.stringify(c.defectTypes),
+            location: c.location ?? "",
+            extent: c.extent ?? "",
+            severity: c.severity ?? null,
+            cause: c.cause ?? "",
+            recommendedAction: c.recommendedAction ?? "",
+            deadline: c.deadline ?? null,
+            note: c.note ?? "",
+            order: k,
+          },
+        });
+        conditionIdByKey.set(`${r.name}:${override.elementKey}:${k}`, condition.id);
+      }
     }
   }
 
   console.log("Adding placeholder photos...");
-  const photoDefs: { room: string; label: string; color: string; caption: string }[] = [
+  const photoDefs: { room: string; conditionKey?: string; label: string; color: string; caption: string }[] = [
     { room: "Obývacia izba", label: "Obývacia izba", color: "#2f6f4f", caption: "Celkový pohľad na obývaciu izbu" },
-    { room: "Obývacia izba", label: "Trhlina pri okne", color: "#8a4b2f", caption: "Detail trhliny pri okne" },
-    { room: "Kúpeľňa", label: "Kúpeľňa - roh vane", color: "#2f5f8a", caption: "Zvýšená vlhkosť pri vani" },
-    { room: "Kuchyňa", label: "Kuchyňa - drez", color: "#8a7a2f", caption: "Pripojenie vody pod drezom" },
-    { room: "Balkón", label: "Balkón - zábradlie", color: "#5f2f8a", caption: "Skorodované kotvenie zábradlia" },
-    { room: "Spálňa 3 / Detská izba", label: "Spálňa 3", color: "#2f8a7a", caption: "Odlupujúca sa maľovka pri parapete" },
+    { room: "Obývacia izba", conditionKey: "steny:0", label: "Trhlina pri okne", color: "#8a4b2f", caption: "Detail trhliny pri okne" },
+    { room: "Kúpeľňa", conditionKey: "vlhkost:0", label: "Kúpeľňa - roh vane", color: "#2f5f8a", caption: "Zvýšená vlhkosť pri vani" },
+    { room: "Kuchyňa", conditionKey: "voda_odpady:0", label: "Kuchyňa - drez", color: "#8a7a2f", caption: "Pripojenie vody pod drezom" },
+    { room: "Balkón", conditionKey: "ine:0", label: "Balkón - zábradlie", color: "#5f2f8a", caption: "Skorodované kotvenie zábradlia" },
+    { room: "Spálňa 3 / Detská izba", conditionKey: "steny:0", label: "Spálňa 3", color: "#2f8a7a", caption: "Odlupujúca sa maľovka pri parapete" },
   ];
 
   for (let i = 0; i < photoDefs.length; i++) {
     const def = photoDefs[i];
     const { storageKey, thumbnailKey } = await placeholderPhoto(def.label, def.color);
     const roomId = roomIdByName.get(def.room);
+    const elementConditionId = def.conditionKey ? conditionIdByKey.get(`${def.room}:${def.conditionKey}`) : undefined;
     await db.photo.create({
       data: {
         inspectionId: inspection.id,
         roomId,
+        elementConditionId,
         caption: def.caption,
         storageKey,
         thumbnailKey,
@@ -420,6 +576,7 @@ async function main() {
   const costItems: {
     category: string;
     room?: string;
+    conditionKey?: string;
     name: string;
     description: string;
     quantity: number;
@@ -430,6 +587,7 @@ async function main() {
     {
       category: "Odstránenie vlhkosti a plesní",
       room: "Kúpeľňa",
+      conditionKey: "vlhkost:0",
       name: "Odborné posúdenie hydroizolácie kúpeľne",
       description: "Diagnostika príčiny vlhkosti pri vani, odborný posudok",
       quantity: 1,
@@ -440,6 +598,7 @@ async function main() {
     {
       category: "Odstránenie vlhkosti a plesní",
       room: "Kúpeľňa",
+      conditionKey: "plesen:0",
       name: "Sanácia plesne v škárach obkladu",
       description: "Odstránenie plesne, prespárovanie, protiplesňový náter",
       quantity: 3,
@@ -450,6 +609,7 @@ async function main() {
     {
       category: "Vodoinštalácia",
       room: "Kuchyňa",
+      conditionKey: "voda_odpady:0",
       name: "Výmena pripojenia drezu",
       description: "Výmena skorodovaného pripojenia vody pod drezom",
       quantity: 1,
@@ -460,6 +620,7 @@ async function main() {
     {
       category: "Opravy stien a stropov",
       room: "Obývacia izba",
+      conditionKey: "steny:0",
       name: "Oprava trhliny v stene",
       description: "Vysprávkovanie trhliny, výstužná páska, stierka",
       quantity: 1,
@@ -490,6 +651,7 @@ async function main() {
     {
       category: "Zámočnícke práce",
       room: "Balkón",
+      conditionKey: "ine:0",
       name: "Kontrola a oprava kotvenia zábradlia",
       description: "Statická kontrola, prípadná výmena kotviacich prvkov",
       quantity: 1,
@@ -584,11 +746,16 @@ async function main() {
 
   for (let i = 0; i < costItems.length; i++) {
     const c = costItems[i];
+    const elementKey = c.conditionKey?.split(":")[0];
+    const roomElementId = c.room && elementKey ? elementIdByKey.get(`${c.room}:${elementKey}`) : undefined;
+    const elementConditionId = c.room && c.conditionKey ? conditionIdByKey.get(`${c.room}:${c.conditionKey}`) : undefined;
     await db.costItem.create({
       data: {
         inspectionId: inspection.id,
         categoryId: catId(c.category),
         roomId: c.room ? roomIdByName.get(c.room) : undefined,
+        roomElementId,
+        elementConditionId,
         name: c.name,
         description: c.description,
         quantity: c.quantity,
@@ -686,9 +853,10 @@ async function main() {
     where: { inspectionId: draft.id },
     data: { address: "Záhradná 8", municipality: "Pezinok", postalCode: "902 01" },
   });
-  await db.room.create({
+  const draftRoom = await db.room.create({
     data: { inspectionId: draft.id, name: "Obývacia izba", type: "Obývacia izba", order: 0 },
   });
+  await seedRoomElements(db, draftRoom.id, draftRoom.type);
 
   console.log("Seed complete.");
   await db.$disconnect();

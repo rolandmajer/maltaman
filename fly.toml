@@ -1,9 +1,7 @@
-# fly.toml — generated for the MALTAMAN app's Docker/Fly.io deployment.
-# Run `fly launch --no-deploy --copy-config` (or edit `app`/`primary_region` below) before
-# the first deploy — app names are globally unique on Fly.io. See README.md's
+# fly.toml — MALTAMAN app's Docker/Fly.io deployment. See README.md's
 # "Deploying to Fly.io" section for the full walkthrough.
 
-app = "maltaman-app"
+app = "maltaman"
 primary_region = "fra"
 
 [build]

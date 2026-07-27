@@ -34,6 +34,25 @@ export const recommendationCategorySchema = z.enum([
 ]);
 export const signatureRoleSchema = z.enum(["TECHNICIAN", "TECHNICIAN2", "CLIENT"]);
 export const inspectionStatusSchema = z.enum(["DRAFT", "COMPLETED"]);
+export const elementStatusSchema = z.enum(["OK", "V", "R", "N", "NEVZTAHUJE_SA"]);
+export const elementNAReasonSchema = z.enum([
+  "NEPRISTUPNE",
+  "ZAKRYTE_NABYTKOM",
+  "ZAKRYTE_KONSTRUKCIOU",
+  "NEBOLO_MOZNE_BEZPECNE_POSUDIT",
+  "MIMO_ROZSAHU_OBHLIADKY",
+  "FUNKCNOST_NEBOLO_MOZNE_OVERIT",
+  "INY_DOVOD",
+]);
+export const conditionDeadlineSchema = z.enum([
+  "OKAMZITE",
+  "DO_1_MESIACA",
+  "DO_3_MESIACOV",
+  "DO_1_ROKA",
+  "PRI_NAJBLIZSEJ_REKONSTRUKCII",
+  "SLEDOVAT",
+  "NIE_JE_POTREBNY",
+]);
 
 // ---------------------------------------------------------------------------
 // Inspection root
@@ -183,6 +202,53 @@ export const measurementSchema = z.object({
 export const measurementUpdateSchema = measurementSchema.partial();
 
 // ---------------------------------------------------------------------------
+// Room elements — structured checklist (RoomElement / ElementAttribute / ElementCondition)
+// ---------------------------------------------------------------------------
+
+export const roomElementSchema = z.object({
+  elementKey: z.string().min(1),
+  label: z.string().min(1),
+  order: z.number().int().optional(),
+});
+
+export const roomElementUpdateSchema = z.object({
+  label: z.string().min(1).optional(),
+  status: elementStatusSchema.optional(),
+  naReason: elementNAReasonSchema.nullable().optional(),
+  naReasonNote: z.string().optional(),
+  description: z.string().optional(),
+  descriptionIsManual: z.boolean().optional(),
+  order: z.number().int().optional(),
+});
+
+export const elementAttributeSchema = z.object({
+  attributeKey: z.string().min(1),
+  value: z.string(),
+});
+
+export const elementConditionSchema = z.object({
+  // JSON-encoded string[] — opaque at the API layer, same convention as Photo.annotationsJson
+  // (the client stringifies/parses; see src/lib/element-description.ts's json-array helpers).
+  defectTypes: z.string().optional(),
+  location: z.string().optional(),
+  extent: z.string().optional(),
+  severity: findingSeveritySchema.nullable().optional(),
+  cause: z.string().optional(),
+  recommendedAction: z.string().optional(),
+  deadline: conditionDeadlineSchema.nullable().optional(),
+  note: z.string().optional(),
+  includeInSummary: z.boolean().optional(),
+  excludeFromReport: z.boolean().optional(),
+  order: z.number().int().optional(),
+});
+export const elementConditionUpdateSchema = elementConditionSchema.partial();
+
+export const customPresetValueSchema = z.object({
+  category: z.string().min(1),
+  value: z.string().min(1),
+});
+
+// ---------------------------------------------------------------------------
 // Photos (metadata only — binary upload handled via multipart/form-data)
 // ---------------------------------------------------------------------------
 
@@ -190,6 +256,8 @@ export const photoUpdateSchema = z.object({
   roomId: z.string().nullable().optional(),
   findingId: z.string().nullable().optional(),
   elementId: z.string().nullable().optional(),
+  roomElementId: z.string().nullable().optional(),
+  elementConditionId: z.string().nullable().optional(),
   caption: z.string().optional(),
   rotationDegrees: z.number().int().optional(),
   annotationsJson: z.string().optional(),
@@ -216,6 +284,8 @@ export const costItemSchema = z.object({
   roomId: z.string().nullable().optional(),
   findingId: z.string().nullable().optional(),
   elementId: z.string().nullable().optional(),
+  roomElementId: z.string().nullable().optional(),
+  elementConditionId: z.string().nullable().optional(),
   name: z.string().min(1),
   description: z.string().optional(),
   quantity: z.coerce.number().nonnegative().default(1),

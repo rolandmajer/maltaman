@@ -32,6 +32,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const roomId = formData.get("roomId");
     const findingId = formData.get("findingId");
     const elementId = formData.get("elementId");
+    const roomElementId = formData.get("roomElementId");
+    const elementConditionId = formData.get("elementConditionId");
     const caption = formData.get("caption");
     const capturedAt = formData.get("capturedAt");
     const gpsLat = formData.get("gpsLat");
@@ -49,6 +51,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         roomId: typeof roomId === "string" && roomId ? roomId : null,
         findingId: typeof findingId === "string" && findingId ? findingId : null,
         elementId: typeof elementId === "string" && elementId ? elementId : null,
+        roomElementId: typeof roomElementId === "string" && roomElementId ? roomElementId : null,
+        elementConditionId: typeof elementConditionId === "string" && elementConditionId ? elementConditionId : null,
         caption: typeof caption === "string" ? caption : "",
         storageKey,
         thumbnailKey,

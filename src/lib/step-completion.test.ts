@@ -33,12 +33,12 @@ describe("computeStepCompletion", () => {
     expect(computeStepCompletion(inspection)["zakladne-udaje"]).toBe(true);
   });
 
-  it("marks miestnosti complete only when every room has at least one finding", () => {
+  it("marks miestnosti complete only when every room has at least one element", () => {
     const inspection = baseInspection();
-    inspection.rooms = [{ id: "r1", findings: [{ id: "f1" }] }] as never;
+    inspection.rooms = [{ id: "r1", elements: [{ id: "e1" }] }] as never;
     expect(computeStepCompletion(inspection).miestnosti).toBe(true);
 
-    inspection.rooms = [{ id: "r1", findings: [] }] as never;
+    inspection.rooms = [{ id: "r1", elements: [] }] as never;
     expect(computeStepCompletion(inspection).miestnosti).toBe(false);
   });
 

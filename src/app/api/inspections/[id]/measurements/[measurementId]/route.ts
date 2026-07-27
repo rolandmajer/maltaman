@@ -6,9 +6,12 @@ import { measurementUpdateSchema } from "@/lib/validation";
 async function loadMeasurement(measurementId: string, inspectionId: string) {
   const measurement = await db.measurement.findUnique({
     where: { id: measurementId },
-    include: { finding: true },
+    include: { finding: true, elementCondition: { include: { roomElement: { include: { room: true } } } } },
   });
-  if (!measurement || measurement.finding.inspectionId !== inspectionId) {
+  const belongsToInspection =
+    measurement?.finding?.inspectionId === inspectionId ||
+    measurement?.elementCondition?.roomElement.room.inspectionId === inspectionId;
+  if (!measurement || !belongsToInspection) {
     throw new ApiError(404, "Meranie nebolo nájdené");
   }
   return measurement;

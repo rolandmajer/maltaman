@@ -5,7 +5,7 @@ export function computeStepCompletion(inspection: FullInspection): Record<Wizard
   return {
     "zakladne-udaje": Boolean(inspection.inspectionDate && inspection.property?.address),
     ucastnici: inspection.participants.length > 0,
-    miestnosti: inspection.rooms.length > 0 && inspection.rooms.every((r) => r.findings.length > 0),
+    miestnosti: inspection.rooms.length > 0 && inspection.rooms.every((r) => r.elements.length > 0),
     "technicky-stav": inspection.categories.some((c) => c.elements.some((e) => e.findings.length > 0)),
     zhrnutie: Boolean(inspection.mainRisks || inspection.immediateActions || inspection.overallConditionRating),
     naklady: inspection.costItems.length > 0,

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { DEFAULT_COST_CATEGORIES, DEFAULT_TECHNICAL_CATEGORIES } from "@/lib/constants";
 import { nextProtocolNumber } from "@/lib/format";
+import { copyRoomElementsDeep } from "@/lib/room-element-service";
 
 export const INSPECTION_FULL_INCLUDE = {
   property: true,
@@ -9,7 +10,18 @@ export const INSPECTION_FULL_INCLUDE = {
   rooms: {
     orderBy: { order: "asc" as const },
     include: {
-      findings: { orderBy: { order: "asc" as const }, include: { measurements: true, photos: true } },
+      elements: {
+        orderBy: { order: "asc" as const },
+        include: {
+          attributes: true,
+          conditions: {
+            orderBy: { order: "asc" as const },
+            include: { measurements: true, photos: true, costItems: true },
+          },
+          photos: true,
+          costItems: true,
+        },
+      },
       photos: { orderBy: { order: "asc" as const } },
       costItems: { orderBy: { order: "asc" as const } },
     },
@@ -175,26 +187,7 @@ export async function duplicateInspectionDeep(sourceId: string, createdById: str
         },
       });
       roomIdMap.set(room.id, newRoom.id);
-      for (const finding of room.findings) {
-        await tx.finding.create({
-          data: {
-            inspectionId: inspection.id,
-            roomId: newRoom.id,
-            checklistKey: finding.checklistKey,
-            label: finding.label,
-            status: finding.status,
-            description: finding.description,
-            severity: finding.severity,
-            location: finding.location,
-            recommendedAction: finding.recommendedAction,
-            recommendedSpecialist: finding.recommendedSpecialist,
-            urgency: finding.urgency,
-            isPositiveObservation: finding.isPositiveObservation,
-            includeInSummary: finding.includeInSummary,
-            order: finding.order,
-          },
-        });
-      }
+      await copyRoomElementsDeep(tx, room, newRoom.id, inspection.id, { copyPhotos: true });
     }
 
     const costCategoryIdMap = new Map<string, string>();

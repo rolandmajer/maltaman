@@ -41,20 +41,22 @@ export function computeValidationSummary(inspection: FullInspection): Validation
   }
 
   for (const room of inspection.rooms) {
-    if (room.findings.length === 0) {
+    if (room.elements.length === 0) {
       warnings.push({
         code: `room-${room.id}-checklist`,
         message: `Miestnosť „${room.name}“ nemá vyplnený kontrolný zoznam`,
         step: "miestnosti",
       });
     }
-    const badFindingsMissingDescription = room.findings.filter(
-      (f) => (f.status === "V" || f.status === "R") && !f.description.trim()
+    // Per the room-element spec: OK doesn't require a written note if structured attribute
+    // selections are sufficient, but V/R must have at least one recorded ElementCondition.
+    const badElementsMissingCondition = room.elements.filter(
+      (e) => (e.status === "V" || e.status === "R") && e.conditions.length === 0
     );
-    if (badFindingsMissingDescription.length > 0) {
+    if (badElementsMissingCondition.length > 0) {
       warnings.push({
         code: `room-${room.id}-desc`,
-        message: `Miestnosť „${room.name}“ má zistenia bez popisu`,
+        message: `Miestnosť „${room.name}“ má prvky bez zaznamenaného stavu alebo zistenia`,
         step: "miestnosti",
       });
     }

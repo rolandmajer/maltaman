@@ -11,7 +11,12 @@ import {
   COST_UNIT_LABELS,
   RECOMMENDATION_CATEGORY_LABELS,
   SIGNATURE_ROLE_LABELS,
+  ELEMENT_STATUS_LABELS,
+  ELEMENT_STATUS_SHORT,
+  CONDITION_DEADLINE_LABELS,
+  ROOM_ELEMENT_ADDITIONAL_CONFIG,
 } from "@/lib/constants";
+import { parseJsonStringArray } from "@/lib/element-description";
 import type { FullInspection } from "@/types/inspection";
 import type { AppSettings } from "@/generated/prisma/client";
 import type { Annotation } from "@/components/wizard/photo-annotator";
@@ -55,9 +60,14 @@ function KeyValueTable({ rows }: { rows: [string, string][] }) {
 
 function StatusBadge({ status }: { status: string }) {
   const color = statusColor(status);
+  const label = ELEMENT_STATUS_SHORT[status] ?? status;
   return (
-    <Text style={[styles.badge, { color, borderColor: color }]}>{status}</Text>
+    <Text style={[styles.badge, { color, borderColor: color }]}>{label}</Text>
   );
+}
+
+function attributeLabel(elementKey: string, attributeKey: string): string {
+  return ROOM_ELEMENT_ADDITIONAL_CONFIG[elementKey]?.attributes.find((a) => a.key === attributeKey)?.label ?? attributeKey;
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +211,10 @@ function IdentificationPage({ inspection, settings }: Props) {
           <Text style={styles.paragraph}>{FINDING_STATUS_LABELS[s]}</Text>
         </View>
       ))}
+      <View style={styles.legendRow}>
+        <StatusBadge status="NEVZTAHUJE_SA" />
+        <Text style={styles.paragraph}>{ELEMENT_STATUS_LABELS.NEVZTAHUJE_SA}</Text>
+      </View>
     </Page>
   );
 }
@@ -209,9 +223,68 @@ function IdentificationPage({ inspection, settings }: Props) {
 // Rooms
 // ---------------------------------------------------------------------------
 
-function RoomsSection({ inspection, settings }: Props) {
+function roomElementCounts(room: FullInspection["rooms"][number]) {
+  const assessed = room.elements.filter((e) => e.status !== "NEVZTAHUJE_SA");
+  return {
+    ok: assessed.filter((e) => e.status === "OK").length,
+    defects: assessed.filter((e) => e.status === "V").length,
+    risks: assessed.filter((e) => e.status === "R").length,
+    notAssessed: assessed.filter((e) => e.status === "N").length,
+  };
+}
+
+function ConditionBlock({ condition, inspection, photoBuffers }: {
+  condition: FullInspection["rooms"][number]["elements"][number]["conditions"][number];
+  inspection: FullInspection;
+  photoBuffers: Map<string, Buffer>;
+}) {
+  const defectTypes = parseJsonStringArray(condition.defectTypes);
+  const rows: [string, string][] = [];
+  if (defectTypes.length > 0) rows.push(["Typ", defectTypes.join(", ")]);
+  if (condition.location) rows.push(["Umiestnenie", condition.location]);
+  if (condition.extent) rows.push(["Rozsah", condition.extent]);
+  if (condition.cause) rows.push(["Predpokladaná príčina", condition.cause]);
+  if (condition.recommendedAction) rows.push(["Odporúčané opatrenie", condition.recommendedAction]);
+  if (condition.deadline) rows.push(["Termín zásahu", CONDITION_DEADLINE_LABELS[condition.deadline]]);
+  if (condition.note) rows.push(["Poznámka", condition.note]);
+  if (condition.measurements.length > 0) {
+    rows.push(["Merania", condition.measurements.map((m) => `${m.label}: ${formatNumber(m.value)} ${m.unit}`).join(", ")]);
+  }
+  const cost = inspection.costItems.filter((c) => c.elementConditionId === condition.id && c.included);
+  const costSum = cost.reduce((s, c) => s + computeCostItem(c).priceInclVat, 0);
+  if (costSum > 0) rows.push(["Odhad nákladov", formatCurrency(costSum)]);
+
+  const photos = condition.photos.filter((p) => !p.excludeFromReport);
+
+  if (rows.length === 0 && photos.length === 0) return null;
+
   return (
-    <Page size="A4" style={styles.page}>
+    <View style={{ marginBottom: 6, paddingLeft: 6, borderLeftWidth: 2, borderLeftColor: colors.border }} wrap={false}>
+      {condition.severity && (
+        <Text style={[styles.paragraph, { fontWeight: "bold" }]}>{FINDING_SEVERITY_LABELS[condition.severity]}</Text>
+      )}
+      {rows.map(([label, value]) => (
+        <Text key={label} style={[styles.paragraph, styles.muted]}>
+          {label}: {value}
+        </Text>
+      ))}
+      {photos.length > 0 && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2 }}>
+          {photos.map((photo) => {
+            const buffer = photoBuffers.get(photo.id);
+            return buffer ? (
+              <Image key={photo.id} src={buffer} style={{ width: 48, height: 48, objectFit: "cover" }} />
+            ) : null;
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function RoomsSection({ inspection, settings, photoBuffers }: Props) {
+  return (
+    <Page size="A4" style={styles.page} wrap>
       <HeaderFooter inspection={inspection} settings={settings} />
       <Text style={styles.sectionTitle}>6. Obhliadka po miestnostiach</Text>
       {inspection.rooms.length === 0 && <Text style={styles.paragraph}>Neboli zaznamenané žiadne miestnosti.</Text>}
@@ -220,8 +293,9 @@ function RoomsSection({ inspection, settings }: Props) {
         .sort((a, b) => a.order - b.order)
         .map((room) => {
           const area = computeRoomArea(room.lengthM, room.widthM, room.areaOverrideM2);
+          const counts = roomElementCounts(room);
           return (
-            <View key={room.id} wrap={false} style={{ marginBottom: 10 }}>
+            <View key={room.id} style={{ marginBottom: 12 }}>
               <Text style={styles.subTitle}>
                 {room.name} ({room.type}){area ? ` — ${formatNumber(area)} m²` : ""}
               </Text>
@@ -230,31 +304,45 @@ function RoomsSection({ inspection, settings }: Props) {
                   {[room.generalCondition, room.accessibility, room.notes].filter(Boolean).join(" · ")}
                 </Text>
               )}
-              <View style={styles.table}>
-                <View style={styles.tableHeaderRow}>
-                  <Text style={[styles.th, { width: "22%" }]}>Prvok</Text>
-                  <Text style={[styles.th, { width: "10%" }]}>Hodn.</Text>
-                  <Text style={[styles.th, { width: "48%" }]}>Zistenie / poznámka</Text>
-                  <Text style={[styles.th, { width: "20%" }]}>Odhad nákladov</Text>
-                </View>
-                {room.findings
-                  .slice()
-                  .sort((a, b) => a.order - b.order)
-                  .map((f, i, arr) => {
-                    const cost = inspection.costItems.filter((c) => c.findingId === f.id && c.included);
-                    const costSum = cost.reduce((s, c) => s + computeCostItem(c).priceInclVat, 0);
+              <Text style={[styles.paragraph, styles.muted]}>
+                {counts.ok} prvkov OK · {counts.defects} vád · {counts.risks} rizík · {counts.notAssessed} neposudzovaných
+              </Text>
+
+              {room.elements
+                .slice()
+                .sort((a, b) => a.order - b.order)
+                .map((element) => {
+                  if (element.status === "NEVZTAHUJE_SA") {
                     return (
-                      <View key={f.id} style={i === arr.length - 1 ? styles.tableRowLast : styles.tableRow} wrap={false}>
-                        <Text style={[styles.td, { width: "22%" }]}>{f.label}</Text>
-                        <View style={{ width: "10%", padding: 4 }}>
-                          <StatusBadge status={f.status} />
-                        </View>
-                        <Text style={[styles.td, { width: "48%" }]}>{f.description || "—"}</Text>
-                        <Text style={[styles.td, { width: "20%" }]}>{costSum > 0 ? formatCurrency(costSum) : "—"}</Text>
+                      <View key={element.id} style={{ flexDirection: "row", gap: 6, marginBottom: 2 }} wrap={false}>
+                        <Text style={[styles.td, { width: "22%" }]}>{element.label}</Text>
+                        <Text style={[styles.td, styles.muted, { width: "78%" }]}>— nevzťahuje sa —</Text>
                       </View>
                     );
-                  })}
-              </View>
+                  }
+                  const setAttributes = element.attributes.filter((a) => a.value);
+                  const conditions = element.conditions.slice().sort((a, b) => a.order - b.order);
+                  return (
+                    <View key={element.id} style={{ marginBottom: 8 }} wrap={false}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={[styles.td, { width: "60%", fontWeight: "bold" }]}>{element.label}</Text>
+                        <StatusBadge status={element.status} />
+                      </View>
+                      {element.status === "N" && element.naReason && (
+                        <Text style={[styles.paragraph, styles.muted]}>Dôvod: {ELEMENT_STATUS_LABELS.N}</Text>
+                      )}
+                      {setAttributes.length > 0 && (
+                        <Text style={[styles.paragraph, styles.muted]}>
+                          {setAttributes.map((a) => `${attributeLabel(element.elementKey, a.attributeKey)}: ${a.value}`).join(" · ")}
+                        </Text>
+                      )}
+                      {element.description && <Text style={styles.paragraph}>{element.description}</Text>}
+                      {conditions.map((condition) => (
+                        <ConditionBlock key={condition.id} condition={condition} inspection={inspection} photoBuffers={photoBuffers} />
+                      ))}
+                    </View>
+                  );
+                })}
             </View>
           );
         })}
@@ -312,10 +400,44 @@ function TechnicalSection({ inspection, settings }: Props) {
 // Findings summary
 // ---------------------------------------------------------------------------
 
+type SummaryDefectRow = {
+  id: string;
+  status: string;
+  severity: string | null;
+  label: string;
+  description: string;
+  source: string;
+};
+
 function FindingsSummaryPage({ inspection, settings }: Props) {
-  const defects = inspection.findings
+  const legacyDefects: SummaryDefectRow[] = inspection.findings
     .filter((f) => (f.status === "V" || f.status === "R") && f.includeInSummary)
-    .sort((a, b) => a.order - b.order);
+    .map((f) => ({
+      id: f.id,
+      status: f.status,
+      severity: f.severity,
+      label: f.label,
+      description: f.description,
+      source: "Technický stav",
+    }));
+
+  const roomNameById = new Map(inspection.rooms.map((r) => [r.id, r.name]));
+  const roomDefects: SummaryDefectRow[] = inspection.rooms.flatMap((room) =>
+    room.elements.flatMap((element) =>
+      element.conditions
+        .filter((c) => c.includeInSummary)
+        .map((c) => ({
+          id: c.id,
+          status: element.status,
+          severity: c.severity,
+          label: element.label,
+          description: [c.location, c.note].filter(Boolean).join(" — ") || parseJsonStringArray(c.defectTypes).join(", "),
+          source: roomNameById.get(room.id) ?? "Miestnosť",
+        }))
+    )
+  );
+
+  const defects = [...legacyDefects, ...roomDefects];
   const positives = inspection.findings.filter((f) => f.isPositiveObservation);
 
   return (
@@ -339,9 +461,10 @@ function FindingsSummaryPage({ inspection, settings }: Props) {
       <View style={styles.table}>
         <View style={styles.tableHeaderRow}>
           <Text style={[styles.th, { width: "8%" }]}>Hodn.</Text>
-          <Text style={[styles.th, { width: "18%" }]}>Závažnosť</Text>
-          <Text style={[styles.th, { width: "22%" }]}>Prvok</Text>
-          <Text style={[styles.th, { width: "52%" }]}>Popis</Text>
+          <Text style={[styles.th, { width: "14%" }]}>Závažnosť</Text>
+          <Text style={[styles.th, { width: "18%" }]}>Prvok</Text>
+          <Text style={[styles.th, { width: "42%" }]}>Popis</Text>
+          <Text style={[styles.th, { width: "18%" }]}>Zdroj</Text>
         </View>
         {defects.length === 0 ? (
           <View style={styles.tableRowLast}>
@@ -353,9 +476,10 @@ function FindingsSummaryPage({ inspection, settings }: Props) {
               <View style={{ width: "8%", padding: 4 }}>
                 <StatusBadge status={f.status} />
               </View>
-              <Text style={[styles.td, { width: "18%" }]}>{f.severity ? FINDING_SEVERITY_LABELS[f.severity] : "—"}</Text>
-              <Text style={[styles.td, { width: "22%" }]}>{f.label}</Text>
-              <Text style={[styles.td, { width: "52%" }]}>{f.description || "—"}</Text>
+              <Text style={[styles.td, { width: "14%" }]}>{f.severity ? FINDING_SEVERITY_LABELS[f.severity] : "—"}</Text>
+              <Text style={[styles.td, { width: "18%" }]}>{f.label}</Text>
+              <Text style={[styles.td, { width: "42%" }]}>{f.description || "—"}</Text>
+              <Text style={[styles.td, styles.muted, { width: "18%" }]}>{f.source}</Text>
             </View>
           ))
         )}

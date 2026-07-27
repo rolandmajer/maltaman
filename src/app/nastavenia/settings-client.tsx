@@ -3,15 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPatch, apiUpload } from "@/lib/offline/api-client";
+import { apiGet, apiPatch, apiPost, apiUpload } from "@/lib/offline/api-client";
 import { useAutosaveForm } from "@/lib/use-autosave-form";
 import { appSettingsUpdateSchema } from "@/lib/validation";
 import { StepPageHeader, StepSection } from "@/components/wizard/step-section";
 import { TextField, TextAreaField } from "@/components/wizard/form-fields";
+import { NativeSelectField } from "@/components/wizard/native-select-field";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiDelete } from "@/lib/offline/api-client";
 import { DEFAULT_COST_CATEGORIES } from "@/lib/constants";
 import type { z } from "zod";
 
@@ -144,7 +146,112 @@ export function SettingsClient() {
         </ul>
         <p className="text-xs text-slate-400">Tento zoznam sa použije pri vytváraní novej obhliadky.</p>
       </StepSection>
+
+      <PresetValuesSection />
     </div>
+  );
+}
+
+const GENERAL_PRESET_CATEGORIES = [
+  { value: "location", label: "Umiestnenie" },
+  { value: "extent", label: "Rozsah" },
+  { value: "recommended-action", label: "Odporúčané opatrenie" },
+];
+
+/**
+ * Generic editor for the org-level custom preset values used by the room-checklist dropdowns
+ * (CustomPresetValue). One panel handles every category via a picker, rather than a bespoke
+ * settings section per element/attribute — new custom values also accrue automatically as
+ * technicians pick "Iné – doplniť" in the wizard, this panel is just for curating them.
+ */
+function PresetValuesSection() {
+  const [category, setCategory] = useState(GENERAL_PRESET_CATEGORIES[0].value);
+  const [customCategory, setCustomCategory] = useState("");
+  const [values, setValues] = useState<{ id: string; value: string }[]>([]);
+  const [newValue, setNewValue] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const activeCategory = customCategory.trim() || category;
+
+  useEffect(() => {
+    // Fetching the preset list for the selected category is a legitimate external-system side
+    // effect (network I/O keyed off a user-driven category change), not derived local state —
+    // see the identical justification already used for description regeneration in
+    // src/components/wizard/room-element-card.tsx.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    apiGet<{ id: string; value: string }[]>(`/api/settings/presets?category=${encodeURIComponent(activeCategory)}`)
+      .then(setValues)
+      .catch(() => toast.error("Nepodarilo sa načítať hodnoty"))
+      .finally(() => setLoading(false));
+  }, [activeCategory]);
+
+  async function addValue() {
+    const trimmed = newValue.trim();
+    if (!trimmed) return;
+    try {
+      const created = await apiPost<{ id: string; value: string }>("/api/settings/presets", {
+        category: activeCategory,
+        value: trimmed,
+      });
+      setValues((prev) => [...prev.filter((v) => v.value !== trimmed), created]);
+      setNewValue("");
+    } catch {
+      toast.error("Pridanie hodnoty zlyhalo");
+    }
+  }
+
+  async function removeValue(id: string) {
+    setValues((prev) => prev.filter((v) => v.id !== id));
+    try {
+      await apiDelete(`/api/settings/presets?id=${id}`);
+    } catch {
+      toast.error("Odstránenie hodnoty zlyhalo");
+    }
+  }
+
+  return (
+    <StepSection title="Vlastné hodnoty pre rozbaľovacie zoznamy">
+      <p className="text-xs text-slate-400">
+        Vlastné hodnoty sa do tohto zoznamu pridávajú aj automaticky, keď technik v obhliadke zvolí „Iné – doplniť
+        vlastný údaj“. Tu ich môžete vopred pripraviť alebo odstrániť.
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <NativeSelectField label="Kategória" value={customCategory ? "" : category} onChange={(v) => { setCategory(v); setCustomCategory(""); }}>
+          {GENERAL_PRESET_CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </NativeSelectField>
+        <Input
+          value={customCategory}
+          onChange={(e) => setCustomCategory(e.target.value)}
+          placeholder="…alebo vlastná kategória, napr. element-attribute:okna:typ_okna"
+          className="h-11"
+        />
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-slate-400">Načítavam…</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {values.length === 0 && <li className="text-sm text-slate-400">Zatiaľ žiadne hodnoty.</li>}
+          {values.map((v) => (
+            <li key={v.id} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-1.5 text-sm">
+              {v.value}
+              <button type="button" onClick={() => void removeValue(v.id)} aria-label={`Odstrániť hodnotu ${v.value}`}>
+                <Trash2 className="size-4 text-red-500" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-2">
+        <Input value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder="Nová hodnota…" />
+        <Button size="sm" variant="outline" onClick={() => void addValue()}>
+          <Plus /> Pridať
+        </Button>
+      </div>
+    </StepSection>
   );
 }
 

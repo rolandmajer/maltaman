@@ -158,7 +158,8 @@ function Section({
 }
 
 function InspectionCard({ inspection }: { inspection: InspectionListItem }) {
-  const issueCount = inspection.findings.filter((f) => f.status === "V" || f.status === "R").length;
+  const roomElementIssues = inspection.rooms.flatMap((r) => r.elements).filter((e) => e.status === "V" || e.status === "R").length;
+  const issueCount = inspection.findings.filter((f) => f.status === "V" || f.status === "R").length + roomElementIssues;
   const firstStep = inspection.status === "COMPLETED" ? "export" : "zakladne-udaje";
 
   return (

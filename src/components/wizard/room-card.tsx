@@ -4,39 +4,78 @@ import { useState } from "react";
 import { ChevronDown, Copy, ArrowUp, ArrowDown } from "lucide-react";
 import { InlineTextField, InlineTextAreaField } from "@/components/wizard/inline-field";
 import { NativeSelectField } from "@/components/wizard/native-select-field";
-import { RoomChecklistRow } from "@/components/wizard/room-checklist-row";
+import { RoomElementCard } from "@/components/wizard/room-element-card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Button } from "@/components/ui/button";
 import { computeRoomArea } from "@/lib/calculations";
 import { formatArea } from "@/lib/format";
 import { ROOM_TYPE_PRESETS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { FullRoom, FullFinding } from "@/types/inspection";
+import type { FullRoom, FullRoomElement } from "@/types/inspection";
+
+type FullElementCondition = FullRoomElement["conditions"][number];
+type FullConditionPhoto = FullElementCondition["photos"][number];
 
 export function RoomCard({
   room,
+  roomTargets,
+  inspectionId,
   defaultOpen,
   canMoveUp,
   canMoveDown,
   onUpdate,
-  onFindingUpdate,
   onDuplicate,
   onDelete,
   onMove,
+  onElementChange,
+  onAttributeChange,
+  onAddCondition,
+  onConditionChange,
+  onConditionDelete,
+  onConditionDuplicate,
+  onConditionReorder,
+  onConditionCopyToRooms,
+  onConditionCreateCostItem,
+  onMeasurementAdd,
+  onMeasurementChange,
+  onMeasurementDelete,
+  onPhotoAdded,
+  onPhotoDeleted,
+  onAddInstance,
+  onCopyAssessmentToRooms,
+  onApplyAttributesToRooms,
 }: {
   room: FullRoom;
+  roomTargets: { id: string; name: string }[];
+  inspectionId: string;
   defaultOpen?: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onUpdate: (patch: Partial<FullRoom>) => void;
-  onFindingUpdate: (findingId: string, patch: Partial<FullFinding>) => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onMove: (direction: "up" | "down") => void;
+  onElementChange: (elementId: string, patch: Partial<FullRoomElement>) => void;
+  onAttributeChange: (elementId: string, attributeKey: string, value: string) => void;
+  onAddCondition: (elementId: string) => void;
+  onConditionChange: (elementId: string, conditionId: string, patch: Partial<FullElementCondition>) => void;
+  onConditionDelete: (elementId: string, conditionId: string) => void;
+  onConditionDuplicate: (elementId: string, conditionId: string) => void;
+  onConditionReorder: (elementId: string, orderedIds: string[]) => void;
+  onConditionCopyToRooms: (elementId: string, conditionId: string, targetRoomIds: string[]) => void;
+  onConditionCreateCostItem: (elementId: string, conditionId: string) => void;
+  onMeasurementAdd: (elementId: string, conditionId: string) => void;
+  onMeasurementChange: (elementId: string, conditionId: string, measurementId: string, patch: { label?: string; value?: number; unit?: string }) => void;
+  onMeasurementDelete: (elementId: string, conditionId: string, measurementId: string) => void;
+  onPhotoAdded: (elementId: string, conditionId: string, photo: FullConditionPhoto) => void;
+  onPhotoDeleted: (elementId: string, conditionId: string, photoId: string) => void;
+  onAddInstance: (elementKey: string, baseLabel: string) => void;
+  onCopyAssessmentToRooms: (elementId: string, targetRoomIds: string[]) => void;
+  onApplyAttributesToRooms: (elementId: string, targetRoomIds: string[]) => void;
 }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
   const area = computeRoomArea(room.lengthM, room.widthM, room.areaOverrideM2);
-  const issueCount = room.findings.filter((f) => f.status === "V" || f.status === "R").length;
+  const issueCount = room.elements.filter((e) => e.status === "V" || e.status === "R").length;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -121,16 +160,35 @@ export function RoomCard({
             />
           </div>
 
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">Kontrolný zoznam</h3>
+          <h3 className="mb-2 text-sm font-semibold text-slate-700">Kontrolný zoznam prvkov</h3>
           <div className="flex flex-col gap-2">
-            {room.findings
+            {room.elements
               .slice()
               .sort((a, b) => a.order - b.order)
-              .map((finding) => (
-                <RoomChecklistRow
-                  key={finding.id}
-                  finding={finding}
-                  onChange={(patch) => onFindingUpdate(finding.id, patch)}
+              .map((element) => (
+                <RoomElementCard
+                  key={element.id}
+                  element={element}
+                  roomId={room.id}
+                  inspectionId={inspectionId}
+                  rooms={roomTargets}
+                  onElementChange={(patch) => onElementChange(element.id, patch)}
+                  onAttributeChange={(key, value) => onAttributeChange(element.id, key, value)}
+                  onAddCondition={() => onAddCondition(element.id)}
+                  onConditionChange={(conditionId, patch) => onConditionChange(element.id, conditionId, patch)}
+                  onConditionDelete={(conditionId) => onConditionDelete(element.id, conditionId)}
+                  onConditionDuplicate={(conditionId) => onConditionDuplicate(element.id, conditionId)}
+                  onConditionReorder={(orderedIds) => onConditionReorder(element.id, orderedIds)}
+                  onConditionCopyToRooms={(conditionId, targetRoomIds) => onConditionCopyToRooms(element.id, conditionId, targetRoomIds)}
+                  onConditionCreateCostItem={(conditionId) => onConditionCreateCostItem(element.id, conditionId)}
+                  onMeasurementAdd={(conditionId) => onMeasurementAdd(element.id, conditionId)}
+                  onMeasurementChange={(conditionId, measurementId, patch) => onMeasurementChange(element.id, conditionId, measurementId, patch)}
+                  onMeasurementDelete={(conditionId, measurementId) => onMeasurementDelete(element.id, conditionId, measurementId)}
+                  onPhotoAdded={(conditionId, photo) => onPhotoAdded(element.id, conditionId, photo)}
+                  onPhotoDeleted={(conditionId, photoId) => onPhotoDeleted(element.id, conditionId, photoId)}
+                  onAddInstance={() => onAddInstance(element.elementKey, element.label.replace(/\s\d+$/, ""))}
+                  onCopyAssessmentToRooms={(targetRoomIds) => onCopyAssessmentToRooms(element.id, targetRoomIds)}
+                  onApplyAttributesToRooms={(targetRoomIds) => onApplyAttributesToRooms(element.id, targetRoomIds)}
                 />
               ))}
           </div>

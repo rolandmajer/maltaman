@@ -57,16 +57,29 @@ describe("computeValidationSummary", () => {
     expect(summary.canComplete).toBe(true);
   });
 
-  it("warns about V/R findings that have no description", () => {
+  it("warns about V/R elements that have zero recorded condition entries", () => {
     const inspection = baseInspection();
     inspection.rooms = [
       {
         id: "r1",
         name: "Kúpeľňa",
-        findings: [{ id: "f1", status: "V", description: "" }],
+        elements: [{ id: "e1", status: "V", conditions: [] }],
       },
     ] as never;
     const summary = computeValidationSummary(inspection);
     expect(summary.warnings.some((w) => w.code === "room-r1-desc")).toBe(true);
+  });
+
+  it("does not warn when a V/R element has at least one condition entry", () => {
+    const inspection = baseInspection();
+    inspection.rooms = [
+      {
+        id: "r1",
+        name: "Kúpeľňa",
+        elements: [{ id: "e1", status: "V", conditions: [{ id: "c1" }] }],
+      },
+    ] as never;
+    const summary = computeValidationSummary(inspection);
+    expect(summary.warnings.some((w) => w.code === "room-r1-desc")).toBe(false);
   });
 });

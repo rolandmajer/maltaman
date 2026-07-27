@@ -70,6 +70,16 @@ test.describe("Core inspection workflow", () => {
 
   test("a cost item can be created directly from a finding and shows correct VAT calculation", async ({ page }) => {
     await login(page);
+
+    // "Položka zo zistenia" only offers Technický stav findings (room-checklist items live on a
+    // separate RoomElement/ElementCondition model, not Finding) — mark one as a defect first.
+    await page.goto(`/obhliadky/${inspectionId}/technicky-stav`);
+    await page.getByRole("button", { name: /Základy a nosné konštrukcie/ }).click();
+    const foundationsGroup = page.getByRole("radiogroup", { name: /Základy/ });
+    await foundationsGroup.scrollIntoViewIfNeeded();
+    await foundationsGroup.getByRole("radio", { name: "V" }).click();
+    await page.waitForTimeout(500);
+
     await page.goto(`/obhliadky/${inspectionId}/naklady`);
 
     const itemsBefore = await page.getByTestId("cost-item-card").count();

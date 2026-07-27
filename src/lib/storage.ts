@@ -1,7 +1,7 @@
 // Private file storage for uploaded photos. Files live outside `public/` and are only
 // served through the authenticated `/api/photos/[id]/file` route handler.
 
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
@@ -44,6 +44,24 @@ export async function savePhotoFile(bytes: Buffer): Promise<{ storageKey: string
   await writeFile(path.join(THUMBS_DIR, thumbnailKey), thumbnail);
 
   return { storageKey, thumbnailKey };
+}
+
+/** Copies an existing photo's files under fresh keys — used when duplicating a room/inspection. */
+export async function duplicatePhotoFile(
+  storageKey: string,
+  thumbnailKey: string | null
+): Promise<{ storageKey: string; thumbnailKey: string | null }> {
+  await ensureDirs();
+  const id = randomUUID();
+  const newStorageKey = `${id}.jpg`;
+  await copyFile(path.join(PHOTOS_DIR, storageKey), path.join(PHOTOS_DIR, newStorageKey));
+
+  let newThumbnailKey: string | null = null;
+  if (thumbnailKey) {
+    newThumbnailKey = `${id}.thumb.jpg`;
+    await copyFile(path.join(THUMBS_DIR, thumbnailKey), path.join(THUMBS_DIR, newThumbnailKey));
+  }
+  return { storageKey: newStorageKey, thumbnailKey: newThumbnailKey };
 }
 
 export async function readPhotoFile(storageKey: string, thumbnail = false): Promise<Buffer> {

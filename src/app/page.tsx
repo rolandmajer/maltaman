@@ -14,7 +14,7 @@ export default async function DashboardPage() {
     orderBy: { updatedAt: "desc" },
     include: {
       property: true,
-      rooms: { select: { id: true } },
+      rooms: { select: { id: true, elements: { select: { status: true } } } },
       findings: { select: { id: true, status: true } },
       costItems: {
         select: {
