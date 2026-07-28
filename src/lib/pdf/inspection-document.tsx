@@ -77,16 +77,17 @@ function attributeLabel(elementKey: string, attributeKey: string): string {
 function CoverPage({ inspection, settings, logoBuffer }: Props) {
   return (
     <Page size="A4" style={styles.coverPage}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <View>
+      <View>
+        {logoBuffer ? (
+          <Image src={logoBuffer} style={{ width: 160, objectFit: "contain" }} />
+        ) : (
           <Text style={{ fontSize: 20, fontWeight: "bold", color: colors.brand }}>
             {settings?.companyName ?? "MALTAMAN"}
           </Text>
-          <Text style={{ fontSize: 9, color: colors.muted }}>
-            {settings?.companyTagline ?? "Nezávislé stavebné poradenstvo"}
-          </Text>
-        </View>
-        {logoBuffer && <Image src={logoBuffer} style={{ width: 64, height: 64, objectFit: "contain" }} />}
+        )}
+        <Text style={{ fontSize: 9, color: colors.muted, marginTop: 6 }}>
+          {settings?.companyTagline ?? "Nezávislé stavebné poradenstvo"}
+        </Text>
       </View>
 
       <View style={{ marginTop: 160 }}>

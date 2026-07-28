@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import path from "node:path";
 
-const brand = "#1C473E";
+const brand = "#832321";
 
 function svgIcon(size: number, padding: number) {
   const inner = size - padding * 2;

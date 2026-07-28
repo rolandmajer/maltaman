@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Settings, LogOut, Home } from "lucide-react";
 import { signOutAction } from "@/app/actions";
 import { SyncStatusBadge } from "@/components/sync-status-badge";
@@ -16,8 +17,8 @@ export function AppHeader({ userName, backHref }: { userName: string; backHref?:
               <Home className="size-5" />
             </Link>
           ) : (
-            <Link href="/" className="font-bold text-brand-800">
-              MALTAMAN
+            <Link href="/" aria-label="MALTAMAN">
+              <Image src="/logo.png" alt="MALTAMAN" width={110} height={15} className="h-4 w-auto" priority />
             </Link>
           )}
         </div>

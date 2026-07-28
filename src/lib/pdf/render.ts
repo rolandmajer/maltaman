@@ -1,5 +1,7 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { db } from "@/lib/db";
 import { getFullInspection } from "@/lib/inspection-service";
 import { readPhotoFile } from "@/lib/storage";
@@ -43,6 +45,15 @@ export async function renderInspectionPdf(inspectionId: string): Promise<Buffer>
   if (settings?.logoUrl) {
     try {
       logoBuffer = await readPhotoFile(settings.logoUrl);
+    } catch {
+      logoBuffer = undefined;
+    }
+  }
+  // Fall back to the bundled MALTAMAN wordmark when the org hasn't uploaded its own logo, so the
+  // cover page never ships without a logo.
+  if (!logoBuffer) {
+    try {
+      logoBuffer = await readFile(path.join(process.cwd(), "public/logo.png"));
     } catch {
       logoBuffer = undefined;
     }

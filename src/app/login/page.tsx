@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { LoginForm } from "./login-form";
 import { getSetupStatus } from "@/lib/bootstrap-admin";
 
@@ -14,8 +15,8 @@ export default async function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-brand-900 p-4">
       <div className="w-full max-w-sm rounded-2xl border border-brand-800 bg-white p-8 shadow-xl">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-brand-800">MALTAMAN</h1>
-          <p className="mt-1 text-sm text-slate-500">Protokol z obhliadky nehnuteľnosti</p>
+          <Image src="/logo.png" alt="MALTAMAN" width={220} height={30} className="mx-auto h-8 w-auto" priority />
+          <p className="mt-2 text-sm text-slate-500">Protokol z obhliadky nehnuteľnosti</p>
         </div>
         {setup && (
           <div
