@@ -35,12 +35,16 @@ function defectOptionsFor(elementKey: string, attributes: FullElementAttribute[]
   if (!config) return GENERAL_DEFECT_PRESETS;
   let options = [...config.base];
   if (config.conditionalOn) {
-    const controllingValue = attributes.find((a) => a.attributeKey === config.conditionalOn!.attributeKey)?.value;
-    if (controllingValue && config.conditionalOn.valueToOptions[controllingValue]) {
-      options = [...options, ...config.conditionalOn.valueToOptions[controllingValue]];
+    const raw = attributes.find((a) => a.attributeKey === config.conditionalOn!.attributeKey)?.value ?? "";
+    // The controlling attribute may be multi-select (a kitchen floor that is part dlažba, part
+    // drevo) — union the defect vocabulary of every selected material rather than matching one.
+    const selected = raw.startsWith("[") ? parseJsonStringArray(raw) : [raw];
+    for (const value of selected) {
+      const extra = config.conditionalOn.valueToOptions[value];
+      if (extra) options = [...options, ...extra];
     }
   }
-  return options;
+  return [...new Set(options)];
 }
 
 export function ElementConditionEntry({

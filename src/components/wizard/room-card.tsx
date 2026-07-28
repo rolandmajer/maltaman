@@ -149,7 +149,9 @@ export function RoomCard({
             <InlineTextField
               label="Celkový stav"
               value={room.generalCondition}
-              onCommit={(v) => onUpdate({ generalCondition: v })}
+              // Typing here claims the field: the copy-to-room roll-up stops overwriting it.
+              // Clearing it hands the field back so the roll-up resumes.
+              onCommit={(v) => onUpdate({ generalCondition: v, generalConditionIsManual: v.trim().length > 0 })}
             />
             <InlineTextField label="Prístupnosť" value={room.accessibility} onCommit={(v) => onUpdate({ accessibility: v })} />
             <InlineTextAreaField

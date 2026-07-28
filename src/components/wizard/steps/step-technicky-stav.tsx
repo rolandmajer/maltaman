@@ -8,6 +8,7 @@ import { StepPageHeader, StepSection } from "@/components/wizard/step-section";
 import { RoomChecklistRow } from "@/components/wizard/room-checklist-row";
 import { InlineTextField } from "@/components/wizard/inline-field";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { patchFindingEverywhere } from "@/lib/finding-state";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { FullCategory, FullElement, FullFinding } from "@/types/inspection";
@@ -16,23 +17,9 @@ export function StepTechnickyStav() {
   const { inspection, applyAndSave, create } = useInspectionContext();
   const categories = inspection.categories.slice().sort((a, b) => a.order - b.order);
 
-  function updateFinding(categoryId: string, elementId: string, findingId: string, patch: Partial<FullFinding>) {
+  function updateFinding(findingId: string, patch: Partial<FullFinding>) {
     void applyAndSave(
-      (prev) => ({
-        ...prev,
-        categories: prev.categories.map((c) =>
-          c.id !== categoryId
-            ? c
-            : {
-                ...c,
-                elements: c.elements.map((e) =>
-                  e.id !== elementId
-                    ? e
-                    : { ...e, findings: e.findings.map((f) => (f.id === findingId ? { ...f, ...patch } : f)) }
-                ),
-              }
-        ),
-      }),
+      (prev) => patchFindingEverywhere(prev, findingId, patch),
       () => apiPatch(`/api/inspections/${inspection.id}/findings/${findingId}`, patch, "Technický prvok")
     );
   }
@@ -125,7 +112,7 @@ export function StepTechnickyStav() {
             onAddElement={() => void addElement(category.id)}
             onRenameElement={(elementId, name) => renameElement(category.id, elementId, name)}
             onDeleteElement={(elementId) => deleteElement(category.id, elementId)}
-            onFindingChange={(elementId, findingId, patch) => updateFinding(category.id, elementId, findingId, patch)}
+            onFindingChange={(findingId, patch) => updateFinding(findingId, patch)}
           />
         ))}
       </div>
@@ -148,7 +135,7 @@ function CategoryCard({
   onAddElement: () => void;
   onRenameElement: (elementId: string, name: string) => void;
   onDeleteElement: (elementId: string) => void;
-  onFindingChange: (elementId: string, findingId: string, patch: Partial<FullFinding>) => void;
+  onFindingChange: (findingId: string, patch: Partial<FullFinding>) => void;
 }) {
   const [open, setOpen] = useState(false);
   const elements = category.elements.slice().sort((a, b) => a.order - b.order);
@@ -202,7 +189,7 @@ function CategoryCard({
                 {element.findings[0] ? (
                   <RoomChecklistRow
                     finding={element.findings[0]}
-                    onChange={(patch) => onFindingChange(element.id, element.findings[0].id, patch)}
+                    onChange={(patch) => onFindingChange(element.findings[0].id, patch)}
                   />
                 ) : (
                   <p className="text-xs text-slate-400">Prvok bez záznamu hodnotenia</p>

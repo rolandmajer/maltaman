@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { inspectionUpdateSchema } from "@/lib/validation";
 import { FINDING_SEVERITY_LABELS, OVERALL_CONDITION_LABELS } from "@/lib/constants";
 import { parseJsonStringArray } from "@/lib/element-description";
+import { patchFindingEverywhere } from "@/lib/finding-state";
 import type { z } from "zod";
 import type { FullFinding, FullInspection, FullElementCondition } from "@/types/inspection";
 
@@ -93,7 +94,7 @@ export function StepZhrnutie() {
 
   function updateFinding(id: string, patch: Partial<FullFinding>) {
     void applyAndSave(
-      (prev) => ({ ...prev, findings: prev.findings.map((f) => (f.id === id ? { ...f, ...patch } : f)) }),
+      (prev) => patchFindingEverywhere(prev, id, patch),
       () => apiPatch(`/api/inspections/${inspection.id}/findings/${id}`, patch, "Zistenie")
     );
   }
@@ -132,13 +133,8 @@ export function StepZhrnutie() {
     const reordered = arrayMove(defects, oldIndex, newIndex);
 
     void applyAndSave(
-      (prev) => {
-        const orderMap = new Map(reordered.map((f, i) => [f.id, i]));
-        return {
-          ...prev,
-          findings: prev.findings.map((f) => (orderMap.has(f.id) ? { ...f, order: orderMap.get(f.id)! } : f)),
-        };
-      },
+      (prev) =>
+        reordered.reduce((acc, f, i) => patchFindingEverywhere(acc, f.id, { order: i }), prev),
       () =>
         Promise.all(
           reordered.map((f, i) => apiPatch(`/api/inspections/${inspection.id}/findings/${f.id}`, { order: i }))

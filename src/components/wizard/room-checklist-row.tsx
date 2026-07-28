@@ -3,9 +3,18 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { StatusToggle } from "@/components/wizard/status-toggle";
-import { InlineTextField, InlineTextAreaField } from "@/components/wizard/inline-field";
+import { InlineTextAreaField } from "@/components/wizard/inline-field";
 import { NativeSelectField } from "@/components/wizard/native-select-field";
-import { FINDING_SEVERITY_LABELS, PRIORITY_LABELS } from "@/lib/constants";
+import { SearchableSelect, SearchableMultiSelect } from "@/components/wizard/searchable-select";
+import {
+  FINDING_SEVERITY_LABELS,
+  PRIORITY_LABELS,
+  GENERAL_DEFECT_PRESETS,
+  CONDITION_LOCATION_PRESETS,
+  CONDITION_RECOMMENDED_ACTION_PRESETS,
+  RECOMMENDED_SPECIALIST_PRESETS,
+} from "@/lib/constants";
+import { parseJsonStringArray, stringifyJsonArray } from "@/lib/element-description";
 import { cn } from "@/lib/utils";
 import type { FullFinding } from "@/types/inspection";
 
@@ -18,6 +27,7 @@ export function RoomChecklistRow({
 }) {
   const needsDetail = finding.status === "V" || finding.status === "R";
   const [expanded, setExpanded] = useState(needsDetail);
+  const defectTypes = parseJsonStringArray(finding.defectTypes);
 
   return (
     <div className="rounded-lg border border-slate-200">
@@ -42,6 +52,15 @@ export function RoomChecklistRow({
       </div>
       {expanded && (
         <div className="flex flex-col gap-3 border-t border-slate-100 p-3">
+          {needsDetail && (
+            <SearchableMultiSelect
+              label="Typ stavu alebo poškodenia"
+              values={defectTypes}
+              onChange={(values) => onChange({ defectTypes: stringifyJsonArray(values) })}
+              options={GENERAL_DEFECT_PRESETS}
+              category="defect-type"
+            />
+          )}
           <InlineTextAreaField
             label="Zistenie / poznámka"
             value={finding.description}
@@ -72,18 +91,29 @@ export function RoomChecklistRow({
                   </option>
                 ))}
               </NativeSelectField>
-              <InlineTextField
-                label="Odporúčaná náprava"
-                value={finding.recommendedAction}
-                className="sm:col-span-2"
-                onCommit={(v) => onChange({ recommendedAction: v })}
-              />
-              <InlineTextField
+              <div className="sm:col-span-2">
+                <SearchableSelect
+                  label="Odporúčaná náprava"
+                  value={finding.recommendedAction}
+                  onChange={(v) => onChange({ recommendedAction: v })}
+                  options={CONDITION_RECOMMENDED_ACTION_PRESETS}
+                  category="recommended-action"
+                />
+              </div>
+              <SearchableSelect
                 label="Odporúčaný špecialista"
                 value={finding.recommendedSpecialist}
-                onCommit={(v) => onChange({ recommendedSpecialist: v })}
+                onChange={(v) => onChange({ recommendedSpecialist: v })}
+                options={RECOMMENDED_SPECIALIST_PRESETS}
+                category="recommended-specialist"
               />
-              <InlineTextField label="Lokalizácia" value={finding.location} onCommit={(v) => onChange({ location: v })} />
+              <SearchableSelect
+                label="Lokalizácia"
+                value={finding.location}
+                onChange={(v) => onChange({ location: v })}
+                options={CONDITION_LOCATION_PRESETS}
+                category="location"
+              />
             </div>
           )}
         </div>

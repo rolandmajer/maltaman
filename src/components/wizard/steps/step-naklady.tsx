@@ -21,7 +21,35 @@ import {
 import { computeCostItem, computeCostTotals, type CostItemForTotals } from "@/lib/calculations";
 import { formatCurrency } from "@/lib/format";
 import { PRIORITY_LABELS } from "@/lib/constants";
-import type { FullCostCategory, FullCostItem } from "@/types/inspection";
+import { parseJsonStringArray } from "@/lib/element-description";
+import type { FullCostCategory, FullCostItem, FullFinding, FullInspection } from "@/types/inspection";
+
+/** One un-priced defect offered in the "+ Položka zo zistenia" picker, from either source. */
+type DefectSource = {
+  key: string;
+  name: string;
+  description: string;
+  /** Where the defect is — shown next to the name so same-named defects stay distinguishable. */
+  location: string;
+  /** The FK(s) tying the created cost item back to its defect. */
+  payload: Record<string, string | null>;
+};
+
+/** "Kúpeľňa" for room findings, "Strecha · Krytina" for Technický stav ones. */
+function findingLocation(
+  finding: FullFinding,
+  roomNames: Map<string, string>,
+  categories: FullInspection["categories"]
+): string {
+  if (finding.roomId) return roomNames.get(finding.roomId) ?? "";
+  if (finding.elementId) {
+    for (const cat of categories) {
+      const el = cat.elements.find((e) => e.id === finding.elementId);
+      if (el) return `${cat.name} · ${el.name}`;
+    }
+  }
+  return finding.location;
+}
 
 export function StepNaklady() {
   const { inspection, applyAndSave, create } = useInspectionContext();
@@ -72,9 +100,9 @@ export function StepNaklady() {
     );
   }
 
-  async function addItemFromFinding(findingId: string) {
-    const finding = inspection.findings.find((f) => f.id === findingId);
-    if (!finding) return;
+  async function addItemFromDefect(key: string) {
+    const defect = uncostedDefects.find((d) => d.key === key);
+    if (!defect) return;
     setFindingPickerOpen(false);
     await create(
       () =>
@@ -82,10 +110,11 @@ export function StepNaklady() {
           `/api/inspections/${inspection.id}/cost-items`,
           {
             categoryId: categories[0]?.id,
-            roomId: finding.roomId,
-            findingId: finding.id,
-            name: finding.label,
-            description: finding.description,
+            ...defect.payload,
+            // Carry the location into the item name so the budget line stays self-describing
+            // even after the source defect is edited or the report is read out of context.
+            name: defect.location ? `${defect.name} — ${defect.location}` : defect.name,
+            description: defect.description,
             quantity: 1,
             unit: "KS",
           },
@@ -135,9 +164,41 @@ export function StepNaklady() {
     );
   }
 
-  const findingsWithoutCost = inspection.findings.filter(
-    (f) => (f.status === "V" || f.status === "R") && !inspection.costItems.some((c) => c.findingId === f.id)
-  );
+  // Every un-priced defect in the protocol, from both sources: the flat Finding list (Technický
+  // stav) and the room checklist's ElementConditions. Room conditions were previously missing
+  // from this picker entirely, so room defects could not be turned into cost items at all.
+  const uncostedDefects = ((): DefectSource[] => {
+    const roomNames = new Map(inspection.rooms.map((r) => [r.id, r.name]));
+
+    const findingSources: DefectSource[] = inspection.findings
+      .filter((f) => (f.status === "V" || f.status === "R") && !inspection.costItems.some((c) => c.findingId === f.id))
+      .map((f) => ({
+        key: `finding:${f.id}`,
+        name: f.label,
+        description: f.description,
+        location: findingLocation(f, roomNames, inspection.categories),
+        payload: { findingId: f.id, roomId: f.roomId },
+      }));
+
+    const conditionSources: DefectSource[] = inspection.rooms.flatMap((room) =>
+      room.elements
+        .filter((el) => el.status === "V" || el.status === "R")
+        .flatMap((el) =>
+          el.conditions
+            .filter((c) => !inspection.costItems.some((ci) => ci.elementConditionId === c.id))
+            .map((c) => ({
+              key: `condition:${c.id}`,
+              name: el.label,
+              description:
+                [parseJsonStringArray(c.defectTypes).join(", "), c.note].filter(Boolean).join(" — ") || el.description,
+              location: [room.name, c.location].filter(Boolean).join(" · "),
+              payload: { elementConditionId: c.id, roomElementId: el.id, roomId: room.id },
+            }))
+        )
+    );
+
+    return [...findingSources, ...conditionSources];
+  })();
 
   return (
     <div>
@@ -186,18 +247,21 @@ export function StepNaklady() {
         <Select
           open={findingPickerOpen}
           onOpenChange={setFindingPickerOpen}
-          onValueChange={(v) => void addItemFromFinding(v)}
+          onValueChange={(v) => void addItemFromDefect(v)}
         >
-          <SelectTrigger className="w-64">
-            <SelectValue placeholder="+ Položka zo zistenia…" />
+          <SelectTrigger className="w-72">
+            <SelectValue placeholder={`+ Položka zo zistenia… (${uncostedDefects.length})`} />
           </SelectTrigger>
           <SelectContent>
-            {findingsWithoutCost.length === 0 && (
+            {uncostedDefects.length === 0 && (
               <div className="px-2 py-1.5 text-sm text-slate-400">Žiadne zistenia bez položky</div>
             )}
-            {findingsWithoutCost.map((f) => (
-              <SelectItem key={f.id} value={f.id}>
-                {f.label}
+            {uncostedDefects.map((d) => (
+              <SelectItem key={d.key} value={d.key}>
+                <span className="flex flex-col items-start">
+                  <span>{d.name}</span>
+                  {d.location && <span className="text-xs text-slate-400">{d.location}</span>}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>

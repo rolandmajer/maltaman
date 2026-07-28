@@ -194,11 +194,20 @@ export async function copyConditionToRoom(conditionId: string, targetRoomId: str
     });
   }
 
+  // Carry the source element's status across. Without this the copied defect lands under an
+  // element still marked OK, so it never shows up in the room summary, Zhrnutie, or the PDF.
+  if (isDefectStatus(source.roomElement.status) && targetElement.status !== source.roomElement.status) {
+    targetElement = await db.roomElement.update({
+      where: { id: targetElement.id },
+      data: { status: source.roomElement.status },
+    });
+  }
+
   const maxCondOrder = await db.elementCondition.aggregate({
     where: { roomElementId: targetElement.id },
     _max: { order: true },
   });
-  return db.elementCondition.create({
+  const created = await db.elementCondition.create({
     data: {
       roomElementId: targetElement.id,
       defectTypes: source.defectTypes,
@@ -218,6 +227,51 @@ export async function copyConditionToRoom(conditionId: string, targetRoomId: str
     },
     include: { measurements: true, photos: true, costItems: true },
   });
+
+  await refreshRoomConditionSummary(targetRoomId);
+  return created;
+}
+
+/**
+ * Recomputes Room.generalCondition from its elements' statuses (e.g. "2 vady, 1 riziko").
+ * Skipped once the technician has typed their own text — generalConditionIsManual mirrors
+ * RoomElement.descriptionIsManual, so a hand-written assessment is never silently overwritten.
+ */
+export async function refreshRoomConditionSummary(roomId: string) {
+  const room = await db.room.findUnique({ where: { id: roomId }, include: { elements: true } });
+  if (!room || room.generalConditionIsManual) return;
+
+  const summary = summariseRoomCondition(room.elements.map((el) => el.status));
+  if (summary !== room.generalCondition) {
+    await db.room.update({ where: { id: roomId }, data: { generalCondition: summary } });
+  }
+}
+
+/** Pure counterpart of refreshRoomConditionSummary — e.g. ["V","V","R"] → "2 vady, 1 riziko". */
+export function summariseRoomCondition(statuses: string[]): string {
+  const counts = { V: 0, R: 0, N: 0 };
+  for (const status of statuses) {
+    if (status === "V") counts.V++;
+    else if (status === "R") counts.R++;
+    else if (status === "N") counts.N++;
+  }
+
+  const parts: string[] = [];
+  if (counts.V) parts.push(`${counts.V} ${plural(counts.V, "vada", "vady", "vád")}`);
+  if (counts.R) parts.push(`${counts.R} ${plural(counts.R, "riziko", "riziká", "rizík")}`);
+  if (counts.N) parts.push(`${counts.N} ${plural(counts.N, "neposúdený prvok", "neposúdené prvky", "neposúdených prvkov")}`);
+  return parts.length ? parts.join(", ") : "Bez zistených vád";
+}
+
+/** Slovak count agreement: 1 → one, 2–4 → few, 5+ → many. */
+function plural(n: number, one: string, few: string, many: string) {
+  if (n === 1) return one;
+  if (n >= 2 && n <= 4) return few;
+  return many;
+}
+
+function isDefectStatus(status: string) {
+  return status === "V" || status === "R";
 }
 
 /**
@@ -286,6 +340,8 @@ export async function copyElementAssessmentToRoom(sourceElementId: string, targe
       },
     });
   }
+
+  await refreshRoomConditionSummary(targetRoomId);
 
   return db.roomElement.findUniqueOrThrow({
     where: { id: targetElement.id },

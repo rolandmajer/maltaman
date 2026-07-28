@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireInspectionAccess, requireSession, jsonError } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
 import { roomElementUpdateSchema } from "@/lib/validation";
-import { loadRoomElement } from "@/lib/room-element-service";
+import { loadRoomElement, refreshRoomConditionSummary } from "@/lib/room-element-service";
 
 type Params = { id: string; roomId: string; elementId: string };
 
@@ -23,6 +23,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<Params> }) 
         costItems: true,
       },
     });
+    // Element statuses drive the room's auto "Celkový stav" text — keep it in step.
+    if (data.status !== undefined) await refreshRoomConditionSummary(roomId);
     return NextResponse.json(updated);
   } catch (error) {
     return jsonError(error);

@@ -245,6 +245,9 @@ model Room {
   heightM          Float?
   areaOverrideM2   Float?
   generalCondition String @default("")
+  // Mirrors RoomElement.descriptionIsManual: once the technician edits generalCondition by hand,
+  // the copy-to-room roll-up stops overwriting it.
+  generalConditionIsManual Boolean @default(false)
   accessibility    String @default("")
   notes            String @default("")
   order            Int    @default(0)
@@ -472,6 +475,7 @@ model Finding {
   label        String // display title of the prvok / finding
 
   status                FindingStatus    @default(OK)
+  defectTypes           String           @default("[]") // JSON string[] — same shape as ElementCondition.defectTypes
   description           String           @default("")
   severity              FindingSeverity?
   location              String           @default("")

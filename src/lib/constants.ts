@@ -330,6 +330,32 @@ export const CONDITION_RECOMMENDED_ACTION_PRESETS = [
   "Okamžite odstaviť alebo zabezpečiť",
 ];
 
+// "Odporúčaný špecialista" options — used by the Technický stav points, where the technician
+// hands a finding off to a trade. Shared preset category, so values learned in one inspection
+// are offered in the next.
+export const RECOMMENDED_SPECIALIST_PRESETS = [
+  "Statik",
+  "Elektrikár",
+  "Revízny technik elektro",
+  "Vodoinštalatér",
+  "Kúrenár",
+  "Plynár",
+  "Revízny technik plynu",
+  "Kominár",
+  "Klampiar",
+  "Pokrývač",
+  "Murár",
+  "Stolár",
+  "Podlahár",
+  "Sklenár",
+  "Špecialista na sanáciu vlhkosti",
+  "Špecialista na sanáciu plesní",
+  "Izolatér",
+  "Energetický audítor",
+  "Špecialista na termovíziu",
+  "Znalec v odbore stavebníctvo",
+];
+
 // Fallback "Typ stavu/poškodenia" list, used for elements without a curated
 // CONDITION_TYPE_PRESETS entry (e.g. "ine" / custom elements).
 export const GENERAL_DEFECT_PRESETS = [
@@ -377,6 +403,7 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "typ_podlahy",
         label: "Typ podlahy",
+        multiSelect: true,
         options: [
           "Laminátová",
           "Vinylová",
@@ -455,6 +482,7 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "konstrukcia",
         label: "Konštrukcia",
+        multiSelect: true,
         options: [
           "Tehlové murivo",
           "Pórobetón",
@@ -470,16 +498,46 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "povrchova_uprava",
         label: "Povrchová úprava",
+        multiSelect: true,
         options: [
+          // Maľby a nátery
           "Maľovka",
+          "Umývateľná maľovka",
+          "Protiplesňový náter",
+          "Latexový náter",
+          // Omietky a stierky
+          "Vápenná omietka",
+          "Vápenno-cementová omietka",
+          "Sadrová omietka",
+          "Hlinená omietka",
+          "Dekoratívna omietka",
+          "Marmolit / mozaiková omietka",
+          "Sadrová stierka",
+          "Betónová stierka",
+          "Benátsky štuk",
+          // Tapety a textílie
           "Tapeta",
+          "Sklotextilná tapeta (sklotextil)",
+          "Textilný obklad",
+          // Obklady
           "Keramický obklad",
           "Drevený obklad",
+          "Drevené palubovky",
           "Kamenný obklad",
-          "Dekoratívna omietka",
+          "Tehlový obklad / tehlový pásik",
+          "Korkový obklad",
+          "Laminátový obklad",
+          "PVC obklad",
+          "Sklenený obklad",
+          "Zrkadlová stena",
+          "3D dekoratívne panely",
+          // Ostatné
+          "Sadrokartónový podhľad / predsadená stena",
           "Pohľadový betón",
+          "Obkladový soklový pás",
           "Bez finálnej úpravy",
           "Kombinovaná",
+          "Nezistené",
         ],
       },
     ],
@@ -489,6 +547,7 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "typ_stropu",
         label: "Typ stropu",
+        multiSelect: true,
         options: [
           "Omietaný strop",
           "Sadrokartónový podhľad",
@@ -532,6 +591,7 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "material_parapetu",
         label: "Materiál",
+        multiSelect: true,
         options: ["PVC", "Drevo", "Laminovaná drevotrieska", "Kameň", "Umelý kameň", "Keramika", "Hliník", "Oceľ"],
       },
     ],
@@ -546,6 +606,7 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "sposob_vedenia",
         label: "Spôsob vedenia",
+        multiSelect: true,
         options: ["Pod omietkou", "V podlahe", "V podhľade", "Povrchové vedenie", "Kombinované", "Nezistené"],
       },
       {
@@ -569,11 +630,13 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "typ_osvetlenia",
         label: "Typ osvetlenia",
+        multiSelect: true,
         options: ["Stropné", "Nástenné", "Bodové", "LED pás", "Závesné", "Zabudované", "Núdzové", "Prirodzené"],
       },
       {
         key: "svetelny_zdroj",
         label: "Svetelný zdroj",
+        multiSelect: true,
         options: ["LED", "Žiarovka", "Halogén", "Žiarivka", "Nezistené"],
       },
     ],
@@ -583,6 +646,7 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "system_vykurovania",
         label: "Systém",
+        multiSelect: true,
         options: [
           "Centrálne",
           "Lokálne",
@@ -668,6 +732,7 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "typ_nabytku",
         label: "Typ",
+        multiSelect: true,
         options: [
           "Vstavaná skriňa",
           "Kuchynská linka",
@@ -681,6 +746,7 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "material_nabytku",
         label: "Materiál",
+        multiSelect: true,
         options: ["Masívne drevo", "Drevotrieska", "MDF", "Kov", "Sklo", "Plast", "Kombinovaný"],
       },
     ],
@@ -695,11 +761,13 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "material_potrubia",
         label: "Materiál viditeľného potrubia",
+        multiSelect: true,
         options: ["Plast", "Meď", "Oceľ", "Viacvrstvové potrubie", "Kombinované", "Nezistené"],
       },
       {
         key: "material_odpadu",
         label: "Materiál odpadu",
+        multiSelect: true,
         options: ["Plast", "Liatina", "Nezistené", "Bez odpadu"],
       },
     ],
@@ -710,11 +778,13 @@ export const ROOM_ELEMENT_ADDITIONAL_CONFIG: Record<string, RoomElementConfig> =
       {
         key: "typ_prvku_sanita",
         label: "Typ prvku",
+        multiSelect: true,
         options: ["Umývadlo", "WC", "Bidet", "Vaňa", "Sprchovací kút", "Sprchový žľab", "Batéria", "Drez", "Pisoár", "Bojler"],
       },
       {
         key: "material_sanita",
         label: "Materiál",
+        multiSelect: true,
         options: ["Keramika", "Akrylát", "Smalt", "Nerez", "Kameň alebo kompozit", "Plast"],
       },
     ],

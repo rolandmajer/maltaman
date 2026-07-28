@@ -4,7 +4,23 @@ import {
   shouldAutoApplyDescription,
   parseJsonStringArray,
   stringifyJsonArray,
+  formatAttributeValue,
 } from "./element-description";
+
+describe("formatAttributeValue", () => {
+  it("passes single-select values through untouched", () => {
+    expect(formatAttributeValue("Maľovka")).toBe("Maľovka");
+    expect(formatAttributeValue("")).toBe("");
+  });
+
+  it("joins a multi-select value into readable text", () => {
+    expect(formatAttributeValue('["Maľovka","Keramický obklad"]')).toBe("Maľovka, Keramický obklad");
+  });
+
+  it("renders an emptied multi-select as blank rather than leaking \"[]\"", () => {
+    expect(formatAttributeValue("[]")).toBe("");
+  });
+});
 
 describe("parseJsonStringArray / stringifyJsonArray", () => {
   it("round-trips a string array through JSON encoding", () => {

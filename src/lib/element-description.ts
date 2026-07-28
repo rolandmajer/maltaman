@@ -17,6 +17,18 @@ export function stringifyJsonArray(values: string[]): string {
   return JSON.stringify(values);
 }
 
+/**
+ * Renders one ElementAttribute value as human text. Multi-select attributes (e.g. a kitchen wall
+ * that is part maľovka, part keramický obklad) are stored JSON-encoded in the same String column
+ * as single-select ones, so every read path has to decode them — this is that single place.
+ */
+export function formatAttributeValue(raw: string): string {
+  if (!raw.startsWith("[")) return raw;
+  const values = parseJsonStringArray(raw);
+  // A malformed/empty array shouldn't leak "[]" into the report.
+  return values.length > 0 ? values.join(", ") : "";
+}
+
 // Extent values that read naturally as a leading adverb ("lokálne poškriabaná..."). Numeric/
 // measured extents (e.g. "0,1–0,5 m²") instead get appended in parentheses at the clause end.
 const QUALITATIVE_EXTENTS = new Set(["Bodové", "Lokálne", "Viacnásobné", "Rozsiahle", "Celoplošné", "Nezmerané"]);
@@ -52,7 +64,10 @@ export function generateElementDescription(
   attributes: { attributeKey: string; value: string }[],
   conditions: ConditionLike[]
 ): string {
-  const getAttr = (key: string) => attributes.find((a) => a.attributeKey === key)?.value;
+  const getAttr = (key: string) => {
+    const raw = attributes.find((a) => a.attributeKey === key)?.value;
+    return raw ? formatAttributeValue(raw) || undefined : raw;
+  };
   const template = DESCRIPTION_TEMPLATES[elementKey];
   const lead = template ? template(getAttr) : "";
 

@@ -16,8 +16,8 @@ import {
   CONDITION_DEADLINE_LABELS,
   ROOM_ELEMENT_ADDITIONAL_CONFIG,
 } from "@/lib/constants";
-import { parseJsonStringArray } from "@/lib/element-description";
-import type { FullInspection } from "@/types/inspection";
+import { parseJsonStringArray, formatAttributeValue } from "@/lib/element-description";
+import type { FullInspection, FullFinding } from "@/types/inspection";
 import type { AppSettings } from "@/generated/prisma/client";
 import type { Annotation } from "@/components/wizard/photo-annotator";
 
@@ -64,6 +64,13 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <Text style={[styles.badge, { color, borderColor: color }]}>{label}</Text>
   );
+}
+
+/** Technický stav cell text: the picked defect types first, then the free-text note. */
+function findingDetail(finding: FullFinding | undefined): string {
+  if (!finding) return "";
+  const types = parseJsonStringArray(finding.defectTypes).join(", ");
+  return [types, finding.description].filter(Boolean).join(" — ");
 }
 
 function attributeLabel(elementKey: string, attributeKey: string): string {
@@ -321,7 +328,9 @@ function RoomsSection({ inspection, settings, photoBuffers }: Props) {
                       </View>
                     );
                   }
-                  const setAttributes = element.attributes.filter((a) => a.value);
+                  // formatAttributeValue, not a.value: an emptied multi-select stores "[]", which
+                  // is truthy but must not render as an attribute row.
+                  const setAttributes = element.attributes.filter((a) => formatAttributeValue(a.value));
                   const conditions = element.conditions.slice().sort((a, b) => a.order - b.order);
                   return (
                     <View key={element.id} style={{ marginBottom: 8 }} wrap={false}>
@@ -334,7 +343,9 @@ function RoomsSection({ inspection, settings, photoBuffers }: Props) {
                       )}
                       {setAttributes.length > 0 && (
                         <Text style={[styles.paragraph, styles.muted]}>
-                          {setAttributes.map((a) => `${attributeLabel(element.elementKey, a.attributeKey)}: ${a.value}`).join(" · ")}
+                          {setAttributes
+                            .map((a) => `${attributeLabel(element.elementKey, a.attributeKey)}: ${formatAttributeValue(a.value)}`)
+                            .join(" · ")}
                         </Text>
                       )}
                       {element.description && <Text style={styles.paragraph}>{element.description}</Text>}
@@ -385,7 +396,7 @@ function TechnicalSection({ inspection, settings }: Props) {
                       <View style={{ width: "10%", padding: 4 }}>
                         <StatusBadge status={f?.status ?? "N"} />
                       </View>
-                      <Text style={[styles.td, { width: "48%" }]}>{f?.description || "—"}</Text>
+                      <Text style={[styles.td, { width: "48%" }]}>{findingDetail(f) || "—"}</Text>
                       <Text style={[styles.td, { width: "20%" }]}>{f?.recommendedSpecialist || "—"}</Text>
                     </View>
                   );
