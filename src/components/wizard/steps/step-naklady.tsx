@@ -101,6 +101,51 @@ export function StepNaklady() {
     );
   }
 
+  async function duplicateItem(id: string) {
+    const source = inspection.costItems.find((i) => i.id === id);
+    if (!source) return;
+    // Append within the source's category — the create endpoint doesn't assign an order, and
+    // leaving it at the default 0 would drop the copy among the other unordered items.
+    const nextOrder =
+      Math.max(-1, ...inspection.costItems.filter((i) => i.categoryId === source.categoryId).map((i) => i.order)) + 1;
+    await create(
+      () =>
+        apiPost<FullCostItem>(
+          `/api/inspections/${inspection.id}/cost-items`,
+          {
+            categoryId: source.categoryId,
+            roomId: source.roomId,
+            findingId: source.findingId,
+            elementId: source.elementId,
+            roomElementId: source.roomElementId,
+            elementConditionId: source.elementConditionId,
+            name: `${source.name} (kópia)`,
+            description: source.description,
+            quantity: source.quantity,
+            unit: source.unit,
+            unitPrice: source.unitPrice,
+            laborCost: source.laborCost,
+            materialCost: source.materialCost,
+            otherCost: source.otherCost,
+            vatRatePercent: source.vatRatePercent,
+            minEstimate: source.minEstimate,
+            expectedEstimate: source.expectedEstimate,
+            maxEstimate: source.maxEstimate,
+            priority: source.priority,
+            completionHorizon: source.completionHorizon,
+            supplier: source.supplier,
+            source: source.source,
+            notes: source.notes,
+            included: source.included,
+            order: nextOrder,
+          },
+          "Kópia položky"
+        ),
+      (prev, created) => ({ ...prev, costItems: [...prev.costItems, created] })
+    );
+    toast.success(`„${source.name}“ duplikované.`);
+  }
+
   async function addItemFromDefect(key: string) {
     const defect = uncostedDefects.find((d) => d.key === key);
     if (!defect) return;
@@ -327,6 +372,7 @@ export function StepNaklady() {
                     item={item}
                     roomOptions={inspection.rooms.map((r) => ({ id: r.id, name: r.name }))}
                     enteredInclVat={inspection.costsEnteredInclVat}
+                    onDuplicate={() => void duplicateItem(item.id)}
                     onUpdate={(patch) => updateItem(item.id, patch)}
                     onDelete={() => deleteItem(item.id)}
                   />

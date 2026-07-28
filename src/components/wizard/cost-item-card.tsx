@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { useRef, useState } from "react";
+import { ChevronDown, ChevronUp, Copy } from "lucide-react";
 import { InlineTextField, InlineTextAreaField } from "@/components/wizard/inline-field";
 import { NativeSelectField } from "@/components/wizard/native-select-field";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { computeCostItem } from "@/lib/calculations";
 import { formatCurrency } from "@/lib/format";
 import { COST_UNIT_LABELS, PRIORITY_LABELS } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn, scrollCardIntoView } from "@/lib/utils";
 import type { FullCostItem } from "@/types/inspection";
 
 export function CostItemCard({
@@ -18,6 +19,7 @@ export function CostItemCard({
   enteredInclVat,
   onUpdate,
   onDelete,
+  onDuplicate,
 }: {
   item: FullCostItem;
   roomOptions: { id: string; name: string }[];
@@ -25,14 +27,23 @@ export function CostItemCard({
   enteredInclVat: boolean;
   onUpdate: (patch: Partial<FullCostItem>) => void;
   onDelete: () => void;
+  onDuplicate: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const computed = computeCostItem(item, enteredInclVat);
   // The amount fields mean different things in the two modes, so say which on every label.
   const vatSuffix = enteredInclVat ? "s DPH" : "bez DPH";
 
+  /** Collapse from the bottom of the card without leaving the technician stranded below it. */
+  function collapse() {
+    setOpen(false);
+    scrollCardIntoView(cardRef.current);
+  }
+
   return (
     <div
+      ref={cardRef}
       data-testid="cost-item-card"
       data-item-id={item.id}
       className={cn("rounded-lg border border-slate-200 bg-white", !item.included && "opacity-60")}
@@ -59,6 +70,9 @@ export function CostItemCard({
           </div>
         </button>
         <span className="shrink-0 text-sm font-semibold text-slate-800">{formatCurrency(computed.priceInclVat)}</span>
+        <Button variant="ghost" size="icon" onClick={onDuplicate} aria-label="Duplikovať položku" title="Duplikovať položku">
+          <Copy className="size-4" />
+        </Button>
         <ConfirmDeleteButton onConfirm={onDelete} title="Odstrániť položku?" description={`Odstrániť „${item.name}“ z rozpočtu?`} />
       </div>
 
@@ -144,6 +158,10 @@ export function CostItemCard({
           <InlineTextField label="Dodávateľ / špecialista" value={item.supplier} onCommit={(v) => onUpdate({ supplier: v })} />
           <InlineTextField label="Zdroj odhadu" value={item.source} onCommit={(v) => onUpdate({ source: v })} />
           <InlineTextAreaField label="Poznámky" value={item.notes} className="sm:col-span-2" onCommit={(v) => onUpdate({ notes: v })} />
+
+          <Button variant="outline" size="sm" onClick={collapse} className="w-full sm:col-span-2">
+            <ChevronUp className="size-4" /> Zavrieť položku
+          </Button>
         </div>
       )}
     </div>
