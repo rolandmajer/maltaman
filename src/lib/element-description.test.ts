@@ -20,6 +20,16 @@ describe("formatAttributeValue", () => {
   it("renders an emptied multi-select as blank rather than leaking \"[]\"", () => {
     expect(formatAttributeValue("[]")).toBe("");
   });
+
+  it("feeds decoded text into the auto description, never raw JSON", () => {
+    const text = generateElementDescription(
+      "podlaha",
+      [{ attributeKey: "typ_podlahy", value: '["Keramická dlažba","Drevená masívna"]' }],
+      []
+    );
+    expect(text).toContain("Keramická dlažba, Drevená masívna");
+    expect(text).not.toContain("[");
+  });
 });
 
 describe("parseJsonStringArray / stringifyJsonArray", () => {
