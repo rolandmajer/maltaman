@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     const withTotals = inspections.map((inspection) => {
       const totalInclVat = inspection.costItems
         .filter((i) => i.included)
-        .reduce((sum, i) => sum + computeCostItem(i).priceInclVat, 0);
+        .reduce((sum, i) => sum + computeCostItem(i, inspection.costsEnteredInclVat).priceInclVat, 0);
       const { costItems, ...rest } = inspection;
       void costItems;
       return { ...rest, costTotalInclVat: Math.round(totalInclVat * 100) / 100 };

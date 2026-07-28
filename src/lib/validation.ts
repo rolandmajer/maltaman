@@ -82,6 +82,7 @@ export const inspectionUpdateSchema = z.object({
   verdictJustification: z.string().optional(),
   contingencyPercent: optionalNumber(),
   costsIncludeVat: z.boolean().optional(),
+  costsEnteredInclVat: z.boolean().optional(),
 });
 
 export const propertyUpdateSchema = z.object({

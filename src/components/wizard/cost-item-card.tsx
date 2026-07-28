@@ -15,16 +15,21 @@ import type { FullCostItem } from "@/types/inspection";
 export function CostItemCard({
   item,
   roomOptions,
+  enteredInclVat,
   onUpdate,
   onDelete,
 }: {
   item: FullCostItem;
   roomOptions: { id: string; name: string }[];
+  /** Whether the amounts on this item were typed gross — see the switch in Odhad nákladov. */
+  enteredInclVat: boolean;
   onUpdate: (patch: Partial<FullCostItem>) => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const computed = computeCostItem(item);
+  const computed = computeCostItem(item, enteredInclVat);
+  // The amount fields mean different things in the two modes, so say which on every label.
+  const vatSuffix = enteredInclVat ? "s DPH" : "bez DPH";
 
   return (
     <div
@@ -105,16 +110,16 @@ export function CostItemCard({
             </NativeSelectField>
           </div>
           <InlineTextField
-            label="Jednotková cena (€)"
+            label={`Jednotková cena (€ ${vatSuffix})`}
             type="number"
             value={String(item.unitPrice)}
             onCommit={(v) => onUpdate({ unitPrice: Number(v) || 0 })}
           />
 
           <div className="grid grid-cols-3 gap-2 sm:col-span-2">
-            <InlineTextField label="Práca (€)" type="number" value={String(item.laborCost)} onCommit={(v) => onUpdate({ laborCost: Number(v) || 0 })} />
-            <InlineTextField label="Materiál (€)" type="number" value={String(item.materialCost)} onCommit={(v) => onUpdate({ materialCost: Number(v) || 0 })} />
-            <InlineTextField label="Ostatné (€)" type="number" value={String(item.otherCost)} onCommit={(v) => onUpdate({ otherCost: Number(v) || 0 })} />
+            <InlineTextField label={`Práca (€ ${vatSuffix})`} type="number" value={String(item.laborCost)} onCommit={(v) => onUpdate({ laborCost: Number(v) || 0 })} />
+            <InlineTextField label={`Materiál (€ ${vatSuffix})`} type="number" value={String(item.materialCost)} onCommit={(v) => onUpdate({ materialCost: Number(v) || 0 })} />
+            <InlineTextField label={`Ostatné (€ ${vatSuffix})`} type="number" value={String(item.otherCost)} onCommit={(v) => onUpdate({ otherCost: Number(v) || 0 })} />
           </div>
 
           <InlineTextField

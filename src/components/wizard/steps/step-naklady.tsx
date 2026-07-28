@@ -69,11 +69,11 @@ export function StepNaklady() {
       roomName: item.roomId ? roomNameById.get(item.roomId) : null,
       priority: item.priority,
       included: item.included,
-      ...computeCostItem(item),
+      ...computeCostItem(item, inspection.costsEnteredInclVat),
     }));
     return computeCostTotals(items, inspection.contingencyPercent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inspection.costItems, inspection.contingencyPercent]);
+  }, [inspection.costItems, inspection.contingencyPercent, inspection.costsEnteredInclVat]);
 
   function updateItem(id: string, patch: Partial<FullCostItem>) {
     void applyAndSave(
@@ -170,6 +170,13 @@ export function StepNaklady() {
     );
   }
 
+  function toggleEnteredInclVat(value: boolean) {
+    void applyAndSave(
+      (prev) => ({ ...prev, costsEnteredInclVat: value }),
+      () => apiPatch(`/api/inspections/${inspection.id}`, { costsEnteredInclVat: value })
+    );
+  }
+
   // Every un-priced defect in the protocol, from both sources: the flat Finding list (Technický
   // stav) and the room checklist's ElementConditions. Room conditions were previously missing
   // from this picker entirely, so room defects could not be turned into cost items at all.
@@ -231,10 +238,25 @@ export function StepNaklady() {
             />
           </div>
           <div className="flex items-center gap-2">
+            <Switch
+              checked={inspection.costsEnteredInclVat}
+              onCheckedChange={toggleEnteredInclVat}
+              id="vat-entered"
+            />
+            <Label htmlFor="vat-entered" className="whitespace-nowrap">
+              Sumy zadávam s DPH
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
             <Switch checked={inspection.costsIncludeVat} onCheckedChange={toggleVatIncluded} id="vat-included" />
             <Label htmlFor="vat-included">Ceny vrátane DPH v reporte</Label>
           </div>
         </div>
+        <p className="text-xs text-slate-500">
+          {inspection.costsEnteredInclVat
+            ? "Sumy na položkách sa berú ako konečné ceny s DPH — základ dane a DPH sa z nich dopočítajú."
+            : "Sumy na položkách sa berú ako ceny bez DPH — DPH sa k nim pripočíta podľa sadzby na položke."}
+        </p>
         {totals.byPriority.length > 0 && (
           <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3 text-xs text-slate-600">
             {totals.byPriority.map((p) => (
@@ -304,6 +326,7 @@ export function StepNaklady() {
                     key={item.id}
                     item={item}
                     roomOptions={inspection.rooms.map((r) => ({ id: r.id, name: r.name }))}
+                    enteredInclVat={inspection.costsEnteredInclVat}
                     onUpdate={(patch) => updateItem(item.id, patch)}
                     onDelete={() => deleteItem(item.id)}
                   />

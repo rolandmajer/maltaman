@@ -140,7 +140,11 @@ model Inspection {
 
   // step 6 — cost estimate options
   contingencyPercent Float   @default(0)
+  // How the report presents prices (wording only).
   costsIncludeVat    Boolean @default(true)
+  // How the technician's typed amounts are interpreted. When true, the figures entered on a cost
+  // item are gross and the net + VAT are derived from them — for quotes given "s DPH".
+  costsEnteredInclVat Boolean @default(false)
 
   // revisions
   revisionNumber     Int          @default(1)

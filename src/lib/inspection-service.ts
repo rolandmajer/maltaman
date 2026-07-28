@@ -146,6 +146,7 @@ export async function duplicateInspectionDeep(sourceId: string, createdById: str
         generalNote: source.generalNote,
         contingencyPercent: source.contingencyPercent,
         costsIncludeVat: source.costsIncludeVat,
+        costsEnteredInclVat: source.costsEnteredInclVat,
         property: source.property
           ? { create: { ...stripId(source.property) } }
           : { create: {} },

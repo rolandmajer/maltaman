@@ -16,6 +16,64 @@ describe("computeCostItem", () => {
     expect(result.priceInclVat).toBe(123);
   });
 
+  it("derives the net price back out of a gross amount when entering incl. VAT", () => {
+    // A contractor quote of "123 € s DPH" at 23% must read back as 100 net + 23 VAT.
+    const result = computeCostItem(
+      { quantity: 1, unitPrice: 123, laborCost: 0, materialCost: 0, otherCost: 0, vatRatePercent: 23 },
+      true
+    );
+    expect(result.priceInclVat).toBe(123);
+    expect(result.priceExclVat).toBe(100);
+    expect(result.vatAmount).toBe(23);
+  });
+
+  it("is the exact inverse of the excl-VAT mode", () => {
+    const net = computeCostItem(
+      { quantity: 1, unitPrice: 250, laborCost: 0, materialCost: 0, otherCost: 0, vatRatePercent: 20 },
+      false
+    );
+    const gross = computeCostItem(
+      { quantity: 1, unitPrice: net.priceInclVat, laborCost: 0, materialCost: 0, otherCost: 0, vatRatePercent: 20 },
+      true
+    );
+    expect(gross.priceExclVat).toBe(250);
+    expect(gross.priceInclVat).toBe(net.priceInclVat);
+  });
+
+  it("keeps net + VAT exactly equal to the gross shown, even when the split does not round evenly", () => {
+    const result = computeCostItem(
+      { quantity: 1, unitPrice: 100, laborCost: 0, materialCost: 0, otherCost: 0, vatRatePercent: 23 },
+      true
+    );
+    // 100 / 1.23 = 81.3008…, so the halves cannot both be exact — they must still sum to 100.
+    expect(result.priceExclVat + result.vatAmount).toBe(result.priceInclVat);
+    expect(result.priceInclVat).toBe(100);
+  });
+
+  it("sums all cost components as one gross total in incl-VAT mode", () => {
+    const result = computeCostItem(
+      { quantity: 2, unitPrice: 50, laborCost: 12, materialCost: 8, otherCost: 4, vatRatePercent: 20 },
+      true
+    );
+    expect(result.priceInclVat).toBe(124);
+    expect(result.priceExclVat).toBe(103.33);
+  });
+
+  it("treats a zero VAT rate as a no-op in both modes", () => {
+    const input = { quantity: 1, unitPrice: 80, laborCost: 0, materialCost: 0, otherCost: 0, vatRatePercent: 0 };
+    for (const mode of [false, true]) {
+      const result = computeCostItem(input, mode);
+      expect(result.priceExclVat).toBe(80);
+      expect(result.priceInclVat).toBe(80);
+      expect(result.vatAmount).toBe(0);
+    }
+  });
+
+  it("defaults to the historical excl-VAT behaviour when no mode is given", () => {
+    const input = { quantity: 1, unitPrice: 100, laborCost: 0, materialCost: 0, otherCost: 0, vatRatePercent: 23 };
+    expect(computeCostItem(input)).toEqual(computeCostItem(input, false));
+  });
+
   it("sums quantity*unitPrice with labour/material/other cost breakdown", () => {
     const result = computeCostItem({
       quantity: 1,

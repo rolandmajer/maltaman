@@ -25,7 +25,12 @@ export type CostItemComputed = {
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /** Row-level totals for a single cost item. Negative inputs are clamped to 0. */
-export function computeCostItem(input: CostItemInput): CostItemComputed {
+/**
+ * @param enteredInclVat When true the technician typed gross amounts (a contractor quote given
+ *   "s DPH"), so the net price and VAT are derived back out of the entered total instead of VAT
+ *   being added on top. Defaults to false — the historical behaviour.
+ */
+export function computeCostItem(input: CostItemInput, enteredInclVat = false): CostItemComputed {
   const quantity = Math.max(0, input.quantity || 0);
   const unitPrice = Math.max(0, input.unitPrice || 0);
   const laborCost = Math.max(0, input.laborCost || 0);
@@ -33,9 +38,20 @@ export function computeCostItem(input: CostItemInput): CostItemComputed {
   const otherCost = Math.max(0, input.otherCost || 0);
   const vatRatePercent = Math.max(0, input.vatRatePercent || 0);
 
-  const priceExclVat = round2(quantity * unitPrice + laborCost + materialCost + otherCost);
-  const vatAmount = round2(priceExclVat * (vatRatePercent / 100));
-  const priceInclVat = round2(priceExclVat + vatAmount);
+  const entered = quantity * unitPrice + laborCost + materialCost + otherCost;
+
+  let priceExclVat: number;
+  let priceInclVat: number;
+  if (enteredInclVat) {
+    priceInclVat = round2(entered);
+    priceExclVat = round2(entered / (1 + vatRatePercent / 100));
+  } else {
+    priceExclVat = round2(entered);
+    priceInclVat = round2(priceExclVat * (1 + vatRatePercent / 100));
+  }
+  // Derived from the two rounded endpoints so net + VAT always equals the gross shown, rather
+  // than drifting a cent from independent rounding.
+  const vatAmount = round2(priceInclVat - priceExclVat);
 
   const expectedEstimate = round2(
     input.expectedEstimate != null && input.expectedEstimate > 0 ? input.expectedEstimate : priceInclVat

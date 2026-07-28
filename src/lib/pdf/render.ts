@@ -27,7 +27,7 @@ export async function renderInspectionPdf(inspectionId: string): Promise<Buffer>
     roomName: item.roomId ? roomNameById.get(item.roomId) : null,
     priority: item.priority,
     included: item.included,
-    ...computeCostItem(item),
+    ...computeCostItem(item, inspection.costsEnteredInclVat),
   }));
   const totals = computeCostTotals(totalsInput, inspection.contingencyPercent);
 

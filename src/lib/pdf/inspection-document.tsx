@@ -259,7 +259,7 @@ function ConditionBlock({ condition, inspection, photoBuffers }: {
     rows.push(["Merania", condition.measurements.map((m) => `${m.label}: ${formatNumber(m.value)} ${m.unit}`).join(", ")]);
   }
   const cost = inspection.costItems.filter((c) => c.elementConditionId === condition.id && c.included);
-  const costSum = cost.reduce((s, c) => s + computeCostItem(c).priceInclVat, 0);
+  const costSum = cost.reduce((s, c) => s + computeCostItem(c, inspection.costsEnteredInclVat).priceInclVat, 0);
   if (costSum > 0) rows.push(["Odhad nákladov", formatCurrency(costSum)]);
 
   const photos = condition.photos.filter((p) => !p.excludeFromReport);
@@ -526,6 +526,7 @@ function CostEstimatePage({ inspection, totals, settings }: Props) {
       <Text style={[styles.paragraph, styles.muted]}>
         Odhady sú orientačné, v cenovej úrovni ku dňu obhliadky ({formatDate(inspection.inspectionDate)}).{" "}
         {inspection.costsIncludeVat ? "Uvedené ceny sú vrátane DPH." : "Uvedené ceny sú bez DPH, pokiaľ nie je uvedené inak."}
+        {inspection.costsEnteredInclVat && " Ceny boli zadané ako konečné sumy s DPH; základ dane a DPH sú z nich dopočítané."}
       </Text>
 
       {categories.map((category) => {
@@ -543,7 +544,7 @@ function CostEstimatePage({ inspection, totals, settings }: Props) {
                 <Text style={[styles.th, { width: "18%" }]}>Cena s DPH</Text>
               </View>
               {items.map((item, i) => {
-                const computed = computeCostItem(item);
+                const computed = computeCostItem(item, inspection.costsEnteredInclVat);
                 return (
                   <View key={item.id} style={i === items.length - 1 ? styles.tableRowLast : styles.tableRow} wrap={false}>
                     <Text style={[styles.td, { width: "34%" }]}>{item.name}</Text>
