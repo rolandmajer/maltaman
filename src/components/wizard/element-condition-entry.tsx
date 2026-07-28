@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Copy, Trash2, Camera, Calculator, FolderInput, X } from "lucide-react";
+import { GripVertical, Copy, Trash2, Camera, Calculator, FolderInput, X, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { SearchableMultiSelect, SearchableSelect } from "@/components/wizard/searchable-select";
 import { InlineTextField, InlineTextAreaField } from "@/components/wizard/inline-field";
@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { apiUpload, apiDelete } from "@/lib/offline/api-client";
 import { parseJsonStringArray, stringifyJsonArray } from "@/lib/element-description";
+import { cn, scrollCardIntoView } from "@/lib/utils";
 import {
   CONDITION_TYPE_PRESETS,
   GENERAL_DEFECT_PRESETS,
@@ -90,9 +91,19 @@ export function ElementConditionEntry({
     id: condition.id,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const entryRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(true);
 
   const defectTypes = parseJsonStringArray(condition.defectTypes);
   const defectOptions = defectOptionsFor(elementKey, attributes);
+
+  /** One-line recap shown when collapsed, so closing an entry doesn't hide what it says. */
+  const summary = [defectTypes.join(", "), condition.location, condition.note].filter(Boolean).join(" — ");
+
+  function collapse() {
+    setOpen(false);
+    scrollCardIntoView(entryRef.current);
+  }
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -122,7 +133,10 @@ export function ElementConditionEntry({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        entryRef.current = node;
+      }}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       data-dragging={isDragging}
       className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3"
@@ -137,9 +151,20 @@ export function ElementConditionEntry({
         >
           <GripVertical className="size-5" />
         </button>
-        <p className="mt-1 flex-1 text-sm font-semibold text-slate-700">
-          {elementLabel} — stav {index + 1}
-        </p>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="mt-1 flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <ChevronDown className={cn("size-4 shrink-0 text-slate-400 transition-transform", open && "rotate-180")} />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-slate-700">
+              {elementLabel} — stav {index + 1}
+            </span>
+            {!open && summary && <span className="block truncate text-xs text-slate-500">{summary}</span>}
+          </span>
+        </button>
         <Button variant="ghost" size="icon" onClick={onDuplicate} aria-label="Duplikovať zistenie" title="Duplikovať">
           <Copy className="size-4" />
         </Button>
@@ -148,6 +173,8 @@ export function ElementConditionEntry({
         </Button>
       </div>
 
+      {!open ? null : (
+        <>
       <SearchableMultiSelect
         label="Typ stavu alebo poškodenia"
         values={defectTypes}
@@ -266,6 +293,12 @@ export function ElementConditionEntry({
           }
         />
       </div>
+
+      <Button variant="outline" size="sm" onClick={collapse} className="w-full">
+        <ChevronUp className="size-4" /> Zavrieť stav {index + 1}
+      </Button>
+        </>
+      )}
     </div>
   );
 }

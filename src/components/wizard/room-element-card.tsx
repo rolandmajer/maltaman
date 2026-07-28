@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, FolderInput, Wand2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronUp, FolderInput, Wand2 } from "lucide-react";
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { ElementStatusToggle } from "@/components/wizard/status-toggle";
@@ -13,7 +13,7 @@ import { RoomTargetPicker } from "@/components/wizard/room-target-picker";
 import { Button } from "@/components/ui/button";
 import { generateElementDescription, shouldAutoApplyDescription } from "@/lib/element-description";
 import { ELEMENT_STATUS_LABELS, ELEMENT_NA_REASON_LABELS, ROOM_ELEMENT_ADDITIONAL_CONFIG } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn, scrollCardIntoView } from "@/lib/utils";
 import type { FullRoomElement } from "@/types/inspection";
 
 export function RoomElementCard({
@@ -64,7 +64,14 @@ export function RoomElementCard({
   const needsDetail = element.status === "V" || element.status === "R";
   const [open, setOpen] = useState(needsDetail);
   const [dismissedAutoText, setDismissedAutoText] = useState<string | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const conditions = element.conditions.slice().sort((a, b) => a.order - b.order);
+
+  /** Collapse from the bottom of a long card without leaving the technician stranded below it. */
+  function collapse() {
+    setOpen(false);
+    scrollCardIntoView(cardRef.current);
+  }
   const config = ROOM_ELEMENT_ADDITIONAL_CONFIG[element.elementKey];
 
   const nextAuto = useMemo(
@@ -96,7 +103,7 @@ export function RoomElementCard({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200">
+    <div ref={cardRef} className="rounded-lg border border-slate-200">
       <div className="flex flex-wrap items-center gap-2 p-2.5">
         <button
           type="button"
@@ -257,6 +264,10 @@ export function RoomElementCard({
               </div>
             </>
           )}
+
+          <Button variant="outline" size="sm" onClick={collapse} className="w-full">
+            <ChevronUp className="size-4" /> Zavrieť „{element.label}“
+          </Button>
         </div>
       )}
     </div>
