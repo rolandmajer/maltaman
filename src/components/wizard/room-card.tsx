@@ -9,7 +9,8 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Button } from "@/components/ui/button";
 import { computeRoomArea } from "@/lib/calculations";
 import { formatArea } from "@/lib/format";
-import { ROOM_TYPE_PRESETS } from "@/lib/constants";
+import { SearchableSelect } from "@/components/wizard/searchable-select";
+import { ROOM_TYPE_PRESETS, ROOM_CONDITION_PRESETS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { FullRoom, FullRoomElement } from "@/types/inspection";
 
@@ -146,12 +147,14 @@ export function RoomCard({
               value={String(room.areaOverrideM2 ?? "")}
               onCommit={(v) => onUpdate({ areaOverrideM2: v ? Number(v) : null })}
             />
-            <InlineTextField
+            <SearchableSelect
               label="Celkový stav"
               value={room.generalCondition}
-              // Typing here claims the field: the copy-to-room roll-up stops overwriting it.
-              // Clearing it hands the field back so the roll-up resumes.
-              onCommit={(v) => onUpdate({ generalCondition: v, generalConditionIsManual: v.trim().length > 0 })}
+              // Choosing (or typing) a value claims the field: the element-status roll-up stops
+              // overwriting it. Clearing it hands the field back so the roll-up resumes.
+              onChange={(v) => onUpdate({ generalCondition: v, generalConditionIsManual: v.trim().length > 0 })}
+              options={ROOM_CONDITION_PRESETS}
+              category="room-condition"
             />
             <InlineTextField label="Prístupnosť" value={room.accessibility} onCommit={(v) => onUpdate({ accessibility: v })} />
             <InlineTextAreaField

@@ -16,6 +16,27 @@ export const WIZARD_STEPS = [
 
 export type WizardStepKey = (typeof WIZARD_STEPS)[number]["key"];
 
+// Options for a room's "Celkový stav". The field is also auto-filled with a roll-up of the room's
+// element statuses ("2 vady, 1 riziko") — picking one of these overrides that and marks the field
+// as manually written, so the roll-up stops overwriting it.
+export const ROOM_CONDITION_PRESETS = [
+  "Výborný",
+  "Dobrý",
+  "Priemerný",
+  "Zhoršený",
+  "Zlý",
+  "Novostavba, bez známok užívania",
+  "Po kompletnej rekonštrukcii",
+  "Po čiastočnej rekonštrukcii",
+  "Pôvodný stav",
+  "Bežné opotrebenie primerané veku",
+  "Vyžaduje kozmetické úpravy",
+  "Vyžaduje čiastočnú rekonštrukciu",
+  "Vyžaduje kompletnú rekonštrukciu",
+  "Nevhodný na užívanie",
+  "Neposúdené — neprístupné",
+];
+
 export const ROOM_TYPE_PRESETS = [
   "Obývacia izba",
   "Spálňa",
@@ -273,6 +294,12 @@ export const CONDITION_DEADLINE_LABELS: Record<string, string> = {
 // General condition-entry dropdown vocabularies (shared by every element; element-specific
 // "Typ stavu/poškodenia" options come from CONDITION_TYPE_PRESETS instead — see below).
 export const CONDITION_LOCATION_PRESETS = [
+  // Whole-property scopes first — Technický stav findings are property-wide, not room-scoped.
+  "Celá nehnuteľnosť",
+  "Komplet",
+  "Viaceré miestnosti",
+  "Spoločné priestory",
+  "Exteriér",
   "Celá miestnosť",
   "Pri vstupe",
   "Stred miestnosti",
@@ -376,6 +403,12 @@ export const GENERAL_DEFECT_PRESETS = [
   "Chýbajúci prvok",
   "Uvoľnený prvok",
   "Znečistenie",
+  // Age/originality — common Technický stav verdicts on installations and building elements.
+  "Stará inštalácia",
+  "Pôvodná inštalácia",
+  "Pôvodný stav",
+  "Zastaraná technológia",
+  "Po dobe životnosti",
   "Bezpečnostné riziko",
   "Potrebné odborné posúdenie",
 ];

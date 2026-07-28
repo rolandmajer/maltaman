@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { useInspectionContext } from "@/lib/inspection-context";
 import { apiPatch, apiPost, apiDelete } from "@/lib/offline/api-client";
 import { StepPageHeader, StepSection } from "@/components/wizard/step-section";
@@ -104,6 +105,10 @@ export function StepNaklady() {
     const defect = uncostedDefects.find((d) => d.key === key);
     if (!defect) return;
     setFindingPickerOpen(false);
+    if (!categories[0]) {
+      toast.error("Najprv pridajte aspoň jednu kategóriu nákladov.");
+      return;
+    }
     await create(
       () =>
         apiPost<FullCostItem>(
@@ -122,6 +127,7 @@ export function StepNaklady() {
         ),
       (prev, created) => ({ ...prev, costItems: [...prev.costItems, created] })
     );
+    toast.success(`„${defect.name}“ pridané ako položka nákladov.`);
   }
 
   async function addCategory() {

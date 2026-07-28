@@ -28,9 +28,13 @@ primary_region = 'fra'
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = 'stop'
+  # Keep one machine warm. With auto_stop='stop'/min=0 the app fully shut down when idle, and the
+  # next request paid ~10s of cold start (machine boot + `prisma migrate deploy` + Next.js start)
+  # — on-site that reads as "the app is slow". Warm requests are ~0.3s. 'suspend' is used instead
+  # of 'stop' for any additional machines so they resume from memory rather than boot cold.
+  auto_stop_machines = 'suspend'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ['app']
 
 [[vm]]

@@ -273,7 +273,12 @@ export function StepMiestnosti() {
     const element = room?.elements.find((e) => e.id === elementId);
     const condition = element?.conditions.find((c) => c.id === conditionId);
     const category = inspection.costCategories[0];
-    if (!element || !condition || !category) return;
+    if (!element || !condition) return;
+    if (!category) {
+      // Previously a silent no-op, which read as "the button does nothing".
+      toast.error("Najprv pridajte aspoň jednu kategóriu nákladov v kroku Odhad nákladov.");
+      return;
+    }
     let defectSummary = "";
     try {
       defectSummary = (JSON.parse(condition.defectTypes) as string[]).join(", ");
@@ -298,6 +303,7 @@ export function StepMiestnosti() {
         ),
       (prev, created) => ({ ...prev, costItems: [...prev.costItems, created as FullRoom["costItems"][number]] })
     );
+    toast.success(`„${element.label}“ pridané do odhadu nákladov (${category.name}).`);
   }
 
   // --- measurement helpers -------------------------------------------------------------------
