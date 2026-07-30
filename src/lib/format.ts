@@ -12,6 +12,32 @@ export function formatCurrency(value: number | null | undefined): string {
   }).format(value);
 }
 
+/**
+ * Parses a number the way a Slovak user actually types it.
+ *
+ * The app prints amounts as "45,00 €", and on a Slovak keyboard the decimal key is a comma — so
+ * "45,50" is the natural thing to enter. `Number("45,50")` is NaN, which the old `Number(v) || 0`
+ * call sites silently turned into 0: a price typed with a comma vanished and the report showed
+ * 0,00 €. Thousands separators (space or non-breaking space, as formatNumber emits) are stripped
+ * for the same reason.
+ *
+ * Returns null for anything that still isn't a number, so callers can distinguish "blank" from
+ * "zero" instead of collapsing both.
+ */
+export function parseDecimal(raw: string): number | null {
+  const cleaned = raw
+    .replace(/[\s  ]/g, "") // ordinary, non-breaking and narrow no-break spaces
+    .replace(",", ".");
+  if (cleaned === "" || cleaned === "-") return null;
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? value : null;
+}
+
+/** parseDecimal with a fallback, for fields that store a plain number rather than a nullable one. */
+export function parseDecimalOr(raw: string, fallback = 0): number {
+  return parseDecimal(raw) ?? fallback;
+}
+
 export function formatNumber(value: number | null | undefined, fractionDigits = 2): string {
   if (value == null || Number.isNaN(value)) return "—";
   return new Intl.NumberFormat(skLocale, {

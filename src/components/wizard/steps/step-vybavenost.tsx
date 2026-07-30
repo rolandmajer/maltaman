@@ -19,10 +19,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AMENITY_CATEGORIES, AMENITY_CATEGORY_LABELS, AMENITY_ATTRIBUTION } from "@/lib/constants";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, parseDecimal, parseDecimalOr } from "@/lib/format";
 import type { FullAmenityPlace, FullInspection } from "@/types/inspection";
 
 type GenerateResponse = { places: FullAmenityPlace[]; locationLabel: string; generatedCount: number };
+
+/** Minutes are stored as whole numbers, so a typed decimal is rounded rather than rejected. */
+function roundedOrNull(raw: string): number | null {
+  const parsed = parseDecimal(raw);
+  return parsed == null ? null : Math.round(parsed);
+}
 
 export function StepVybavenost() {
   const { inspection, applyAndSave, create, refetch } = useInspectionContext();
@@ -306,7 +312,8 @@ function AmenityRow({
             label="Vzdialenosť (m)"
             type="number"
             value={String(place.distanceM)}
-            onCommit={(v) => onUpdate({ distanceM: Number(v) || 0 })}
+            // Rounded: the schema stores whole metres, and a decimal would be rejected outright.
+            onCommit={(v) => onUpdate({ distanceM: Math.round(parseDecimalOr(v)) })}
           />
           <NativeSelectField
             label="Kategória"
@@ -323,13 +330,13 @@ function AmenityRow({
             label="Pešo (min)"
             type="number"
             value={String(place.walkMinutes ?? "")}
-            onCommit={(v) => onUpdate({ walkMinutes: v ? Number(v) : null })}
+            onCommit={(v) => onUpdate({ walkMinutes: roundedOrNull(v) })}
           />
           <InlineTextField
             label="Autom (min)"
             type="number"
             value={String(place.driveMinutes ?? "")}
-            onCommit={(v) => onUpdate({ driveMinutes: v ? Number(v) : null })}
+            onCommit={(v) => onUpdate({ driveMinutes: roundedOrNull(v) })}
           />
           <InlineTextField
             label="Poznámka"

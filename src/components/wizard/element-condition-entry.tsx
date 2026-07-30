@@ -25,6 +25,7 @@ import {
   ROOM_ELEMENT_ADDITIONAL_CONFIG,
 } from "@/lib/constants";
 import type { FullElementCondition, FullElementAttribute } from "@/types/inspection";
+import { parseDecimalOr } from "@/lib/format";
 
 function locationOptionsFor(elementKey: string): string[] {
   const extra = ROOM_ELEMENT_ADDITIONAL_CONFIG[elementKey]?.locationPresets ?? [];
@@ -231,7 +232,7 @@ export function ElementConditionEntry({
               type="number"
               value={String(m.value)}
               placeholder="Hodnota"
-              onCommit={(v) => onMeasurementChange(m.id, { value: Number(v) || 0 })}
+              onCommit={(v) => onMeasurementChange(m.id, { value: parseDecimalOr(v) })}
               className="w-24"
             />
             <InlineTextField value={m.unit} placeholder="Jednotka" onCommit={(v) => onMeasurementChange(m.id, { unit: v })} className="w-20" />

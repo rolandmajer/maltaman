@@ -142,6 +142,23 @@ describe("InlineTextField", () => {
     expect(onCommit).toHaveBeenCalledWith("");
   });
 
+  it("keeps a typed decimal comma instead of discarding it", async () => {
+    // type="number" silently drops anything it considers invalid, including the Slovak decimal
+    // comma — the value arrived as "" and saved as 0. Numeric fields render as text now.
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    render(<InlineTextField label="Cena" value="0" type="number" onCommit={onCommit} />);
+
+    const input = screen.getByLabelText("Cena") as HTMLInputElement;
+    expect(input.type).toBe("text");
+    expect(input.inputMode).toBe("decimal");
+
+    await user.clear(input);
+    await user.type(input, "45,50{Enter}");
+
+    expect(onCommit).toHaveBeenCalledWith("45,50");
+  });
+
   it("still picks up an external change when the field is not being edited", async () => {
     const onCommit = vi.fn();
     const { rerender } = render(<InlineTextField label="Cena" value="10" onCommit={onCommit} />);

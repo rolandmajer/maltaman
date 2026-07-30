@@ -8,7 +8,7 @@ import { RoomElementCard } from "@/components/wizard/room-element-card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Button } from "@/components/ui/button";
 import { computeRoomArea } from "@/lib/calculations";
-import { formatArea } from "@/lib/format";
+import { formatArea, parseDecimal } from "@/lib/format";
 import { SearchableSelect } from "@/components/wizard/searchable-select";
 import { ROOM_TYPE_PRESETS, ROOM_CONDITION_PRESETS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -126,26 +126,26 @@ export function RoomCard({
                 label="Dĺžka (m)"
                 type="number"
                 value={String(room.lengthM ?? "")}
-                onCommit={(v) => onUpdate({ lengthM: v ? Number(v) : null })}
+                onCommit={(v) => onUpdate({ lengthM: parseDecimal(v) })}
               />
               <InlineTextField
                 label="Šírka (m)"
                 type="number"
                 value={String(room.widthM ?? "")}
-                onCommit={(v) => onUpdate({ widthM: v ? Number(v) : null })}
+                onCommit={(v) => onUpdate({ widthM: parseDecimal(v) })}
               />
               <InlineTextField
                 label="Výška (m)"
                 type="number"
                 value={String(room.heightM ?? "")}
-                onCommit={(v) => onUpdate({ heightM: v ? Number(v) : null })}
+                onCommit={(v) => onUpdate({ heightM: parseDecimal(v) })}
               />
             </div>
             <InlineTextField
               label={`Plocha override (vypočítaná: ${area != null ? formatArea(area) : "—"})`}
               type="number"
               value={String(room.areaOverrideM2 ?? "")}
-              onCommit={(v) => onUpdate({ areaOverrideM2: v ? Number(v) : null })}
+              onCommit={(v) => onUpdate({ areaOverrideM2: parseDecimal(v) })}
             />
             <SearchableSelect
               label="Celkový stav"

@@ -8,6 +8,7 @@ import { InlineTextField, InlineTextAreaField } from "@/components/wizard/inline
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Button } from "@/components/ui/button";
 import type { FullInspection, FullParticipant } from "@/types/inspection";
+import { parseDecimal } from "@/lib/format";
 
 export function StepUcastnici() {
   const { inspection, applyAndSave, create } = useInspectionContext();
@@ -140,7 +141,7 @@ export function StepUcastnici() {
             label="Vonkajšia teplota (°C)"
             type="number"
             value={String(conditions?.outdoorTemperatureC ?? "")}
-            onCommit={(v) => updateConditions({ outdoorTemperatureC: v ? Number(v) : null })}
+            onCommit={(v) => updateConditions({ outdoorTemperatureC: parseDecimal(v) })}
           />
           <InlineTextField
             label="Obsadenosť nehnuteľnosti"

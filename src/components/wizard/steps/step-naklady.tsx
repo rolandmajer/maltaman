@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { computeCostItem, computeCostTotals, type CostItemForTotals } from "@/lib/calculations";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, parseDecimalOr } from "@/lib/format";
 import { PRIORITY_LABELS } from "@/lib/constants";
 import { parseJsonStringArray } from "@/lib/element-description";
 import type { FullCostCategory, FullCostItem, FullFinding, FullInspection } from "@/types/inspection";
@@ -278,7 +278,7 @@ export function StepNaklady() {
             <InlineTextField
               value={String(inspection.contingencyPercent)}
               type="number"
-              onCommit={(v) => updateContingency(Number(v) || 0)}
+              onCommit={(v) => updateContingency(parseDecimalOr(v))}
               className="w-24"
             />
           </div>

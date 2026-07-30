@@ -75,9 +75,9 @@ export function InlineTextField({
     if (next !== value) onCommit(next);
   }
 
-  function handleBlur() {
+  function handleBlur(current: string) {
     isEditingRef.current = false;
-    if (isBlocked(local)) {
+    if (isBlocked(current)) {
       // Cleared but never refilled — put back what was there rather than erroring.
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       pendingRef.current = null;
@@ -85,20 +85,27 @@ export function InlineTextField({
       setSyncedValue(value);
       return;
     }
-    flush(local);
+    flush(current);
     // Pick up anything that changed while the field was focused and the resync was suppressed.
-    if (local === value && value !== syncedValue) {
+    if (current === value && value !== syncedValue) {
       setSyncedValue(value);
       setLocal(value);
     }
   }
+
+  // Numeric fields are rendered as text with a decimal keypad rather than type="number".
+  // type="number" throws away anything it considers invalid — including the Slovak decimal comma
+  // the rest of the app prints — so "45,50" arrived here as "" and saved as 0. As text the comma
+  // survives and parseDecimal can read it. inputMode still brings up the number keypad on a phone.
+  const isNumeric = type === "number";
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label && <Label htmlFor={id}>{label}</Label>}
       <Input
         id={id}
-        type={type}
+        type={isNumeric ? "text" : type}
+        inputMode={isNumeric ? "decimal" : undefined}
         value={local}
         placeholder={placeholder}
         onChange={(e) => handleChange(e.target.value)}
@@ -111,7 +118,9 @@ export function InlineTextField({
           flush(e.currentTarget.value);
           e.currentTarget.blur();
         }}
-        onBlur={handleBlur}
+        // Read the DOM value rather than the `local` state: if the last keystroke and the blur land
+        // in the same tick, React has not re-rendered yet and `local` is a character behind.
+        onBlur={(e) => handleBlur(e.currentTarget.value)}
       />
     </div>
   );
@@ -167,10 +176,10 @@ export function InlineTextAreaField({
     if (next !== value) onCommit(next);
   }
 
-  function handleBlur() {
+  function handleBlur(current: string) {
     isEditingRef.current = false;
-    flush(local);
-    if (local === value && value !== syncedValue) {
+    flush(current);
+    if (current === value && value !== syncedValue) {
       setSyncedValue(value);
       setLocal(value);
     }
@@ -193,7 +202,7 @@ export function InlineTextAreaField({
           flush(e.currentTarget.value);
           e.currentTarget.blur();
         }}
-        onBlur={handleBlur}
+        onBlur={(e) => handleBlur(e.currentTarget.value)}
       />
     </div>
   );

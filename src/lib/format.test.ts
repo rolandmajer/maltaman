@@ -1,5 +1,53 @@
 import { describe, it, expect } from "vitest";
-import { formatCurrency, formatDate, formatNumber, nextProtocolNumber } from "./format";
+import { formatCurrency, formatDate, formatNumber, nextProtocolNumber, parseDecimal, parseDecimalOr } from "./format";
+
+describe("parseDecimal", () => {
+  it("reads the Slovak decimal comma the app itself prints", () => {
+    // "45,50" used to become NaN and then 0, so a price typed with a comma silently vanished.
+    expect(parseDecimal("45,50")).toBe(45.5);
+  });
+
+  it("still reads a decimal point", () => {
+    expect(parseDecimal("45.50")).toBe(45.5);
+  });
+
+  it("ignores thousands separators, including the non-breaking space formatNumber emits", () => {
+    expect(parseDecimal("1 200")).toBe(1200);
+    expect(parseDecimal("1 200,50")).toBe(1200.5);
+    expect(parseDecimal("1 200")).toBe(1200);
+  });
+
+  it("returns null for blank so callers can tell it apart from zero", () => {
+    expect(parseDecimal("")).toBeNull();
+    expect(parseDecimal("   ")).toBeNull();
+  });
+
+  it("returns null rather than a silent zero for nonsense", () => {
+    expect(parseDecimal("abc")).toBeNull();
+    expect(parseDecimal("-")).toBeNull();
+  });
+
+  it("keeps zero and negatives distinct from blank", () => {
+    expect(parseDecimal("0")).toBe(0);
+    expect(parseDecimal("-12,5")).toBe(-12.5);
+  });
+
+  it("round-trips what formatNumber produces", () => {
+    expect(parseDecimal(formatNumber(1234.56))).toBe(1234.56);
+  });
+});
+
+describe("parseDecimalOr", () => {
+  it("falls back for blank and nonsense", () => {
+    expect(parseDecimalOr("")).toBe(0);
+    expect(parseDecimalOr("abc")).toBe(0);
+    expect(parseDecimalOr("", 1)).toBe(1);
+  });
+
+  it("passes real numbers through, comma included", () => {
+    expect(parseDecimalOr("45,50")).toBe(45.5);
+  });
+});
 
 describe("formatCurrency", () => {
   it("formats numbers as EUR using Slovak locale grouping/decimal marks", () => {

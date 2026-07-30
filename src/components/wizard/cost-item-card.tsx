@@ -8,7 +8,7 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { computeCostItem } from "@/lib/calculations";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, parseDecimal, parseDecimalOr } from "@/lib/format";
 import { COST_UNIT_LABELS, PRIORITY_LABELS } from "@/lib/constants";
 import { cn, scrollCardIntoView } from "@/lib/utils";
 import type { FullCostItem } from "@/types/inspection";
@@ -111,7 +111,7 @@ export function CostItemCard({
               label="Množstvo"
               type="number"
               value={String(item.quantity)}
-              onCommit={(v) => onUpdate({ quantity: Number(v) || 0 })}
+              onCommit={(v) => onUpdate({ quantity: parseDecimalOr(v) })}
             />
             <NativeSelectField
               label="Jednotka"
@@ -127,20 +127,20 @@ export function CostItemCard({
             label={`Jednotková cena (€ ${vatSuffix})`}
             type="number"
             value={String(item.unitPrice)}
-            onCommit={(v) => onUpdate({ unitPrice: Number(v) || 0 })}
+            onCommit={(v) => onUpdate({ unitPrice: parseDecimalOr(v) })}
           />
 
           <div className="grid grid-cols-3 gap-2 sm:col-span-2">
-            <InlineTextField label={`Práca (€ ${vatSuffix})`} type="number" value={String(item.laborCost)} onCommit={(v) => onUpdate({ laborCost: Number(v) || 0 })} />
-            <InlineTextField label={`Materiál (€ ${vatSuffix})`} type="number" value={String(item.materialCost)} onCommit={(v) => onUpdate({ materialCost: Number(v) || 0 })} />
-            <InlineTextField label={`Ostatné (€ ${vatSuffix})`} type="number" value={String(item.otherCost)} onCommit={(v) => onUpdate({ otherCost: Number(v) || 0 })} />
+            <InlineTextField label={`Práca (€ ${vatSuffix})`} type="number" value={String(item.laborCost)} onCommit={(v) => onUpdate({ laborCost: parseDecimalOr(v) })} />
+            <InlineTextField label={`Materiál (€ ${vatSuffix})`} type="number" value={String(item.materialCost)} onCommit={(v) => onUpdate({ materialCost: parseDecimalOr(v) })} />
+            <InlineTextField label={`Ostatné (€ ${vatSuffix})`} type="number" value={String(item.otherCost)} onCommit={(v) => onUpdate({ otherCost: parseDecimalOr(v) })} />
           </div>
 
           <InlineTextField
             label="Sadzba DPH (%)"
             type="number"
             value={String(item.vatRatePercent)}
-            onCommit={(v) => onUpdate({ vatRatePercent: Number(v) || 0 })}
+            onCommit={(v) => onUpdate({ vatRatePercent: parseDecimalOr(v) })}
           />
           <div className="rounded-lg bg-slate-50 p-2 text-sm">
             <p>Bez DPH: <strong>{formatCurrency(computed.priceExclVat)}</strong></p>
@@ -149,9 +149,9 @@ export function CostItemCard({
           </div>
 
           <div className="grid grid-cols-3 gap-2 sm:col-span-2">
-            <InlineTextField label="Min. odhad (€)" type="number" value={String(item.minEstimate ?? "")} onCommit={(v) => onUpdate({ minEstimate: v ? Number(v) : null })} />
-            <InlineTextField label="Očakávaný odhad (€)" type="number" value={String(item.expectedEstimate ?? "")} onCommit={(v) => onUpdate({ expectedEstimate: v ? Number(v) : null })} />
-            <InlineTextField label="Max. odhad (€)" type="number" value={String(item.maxEstimate ?? "")} onCommit={(v) => onUpdate({ maxEstimate: v ? Number(v) : null })} />
+            <InlineTextField label="Min. odhad (€)" type="number" value={String(item.minEstimate ?? "")} onCommit={(v) => onUpdate({ minEstimate: parseDecimal(v) })} />
+            <InlineTextField label="Očakávaný odhad (€)" type="number" value={String(item.expectedEstimate ?? "")} onCommit={(v) => onUpdate({ expectedEstimate: parseDecimal(v) })} />
+            <InlineTextField label="Max. odhad (€)" type="number" value={String(item.maxEstimate ?? "")} onCommit={(v) => onUpdate({ maxEstimate: parseDecimal(v) })} />
           </div>
 
           <InlineTextField label="Termín / horizont realizácie" value={item.completionHorizon} onCommit={(v) => onUpdate({ completionHorizon: v })} />
