@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { Check } from "lucide-react";
 import { WIZARD_STEPS, type WizardStepKey } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -14,9 +15,28 @@ export function WizardStepper({
   completion: Record<WizardStepKey, boolean>;
 }) {
   const params = useParams<{ step: string }>();
+  const scrollerRef = useRef<HTMLElement | null>(null);
+
+  // The eleven steps are far wider than a phone screen, so on later steps the current one sits
+  // off-screen and had to be dragged into view by hand. Centre it whenever the step changes.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    // Found by query rather than by a ref on the active link: one ref shared across the list is
+    // set by whichever child React commits last, so stepping backwards left it holding null.
+    const active = scroller?.querySelector<HTMLElement>('[aria-current="step"]');
+    if (!scroller || !active) return;
+
+    // Positioned instantly, not animated. The page content under it swaps instantly too, so a
+    // sliding strip would trail behind the step it labels — and smooth scrolling is driven by
+    // requestAnimationFrame, which is exactly what a backgrounded or throttled tab stops running.
+    // scrollLeft rather than scrollIntoView, so only this strip moves and the page does not jump
+    // vertically to reach it.
+    const target = active.offsetLeft - (scroller.clientWidth - active.offsetWidth) / 2;
+    scroller.scrollLeft = Math.max(0, Math.min(target, scroller.scrollWidth - scroller.clientWidth));
+  }, [params.step]);
 
   return (
-    <nav aria-label="Postup obhliadky" className="overflow-x-auto">
+    <nav ref={scrollerRef} aria-label="Postup obhliadky" className="overflow-x-auto">
       <ol className="flex min-w-max items-center gap-1 px-2 py-2">
         {WIZARD_STEPS.map((step, index) => {
           const isActive = params.step === step.key;
