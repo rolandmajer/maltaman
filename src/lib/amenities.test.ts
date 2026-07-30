@@ -6,6 +6,7 @@ import {
   buildCandidates,
   buildOverpassQuery,
   buildGeocodeQuery,
+  buildViewbox,
   type OverpassElement,
 } from "@/lib/amenities";
 import type { AmenityCategoryConfig } from "@/lib/constants";
@@ -152,6 +153,33 @@ describe("buildCandidates", () => {
 
   it("ignores elements that match no configured tag", () => {
     expect(buildCandidates([elementAt(100, { amenity: "bench", name: "Lavička" })], ORIGIN, [SHOPS])).toEqual([]);
+  });
+});
+
+describe("buildViewbox", () => {
+  it("emits the four corners in Nominatim's lon,lat,lon,lat order", () => {
+    const parts = buildViewbox(ORIGIN, 1000).split(",").map(Number);
+    expect(parts).toHaveLength(4);
+    const [lonLeft, latTop, lonRight, latBottom] = parts;
+    expect(lonLeft).toBeLessThan(ORIGIN.lng);
+    expect(lonRight).toBeGreaterThan(ORIGIN.lng);
+    expect(latTop).toBeGreaterThan(ORIGIN.lat);
+    expect(latBottom).toBeLessThan(ORIGIN.lat);
+  });
+
+  it("widens the longitude span more than the latitude span at Slovak latitudes", () => {
+    // A degree of longitude is shorter than a degree of latitude away from the equator, so the
+    // same distance in metres needs a bigger longitude delta — otherwise the box is too narrow.
+    const [lonLeft, latTop, , latBottom] = buildViewbox(ORIGIN, 1000).split(",").map(Number);
+    const lngSpan = ORIGIN.lng - lonLeft;
+    const latSpan = (latTop - latBottom) / 2;
+    expect(lngSpan).toBeGreaterThan(latSpan);
+  });
+
+  it("grows with the radius", () => {
+    const small = Number(buildViewbox(ORIGIN, 1000).split(",")[1]);
+    const large = Number(buildViewbox(ORIGIN, 8000).split(",")[1]);
+    expect(large).toBeGreaterThan(small);
   });
 });
 

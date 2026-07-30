@@ -212,6 +212,20 @@ export function buildOverpassQuery(
   return `[out:json][timeout:60];(${[...clauses].join("")});out center tags;`;
 }
 
+/**
+ * A bounding box around a point, as Nominatim's `viewbox` expects it
+ * (`lon_left,lat_top,lon_right,lat_bottom`). Used with `bounded=1` so a name search returns the
+ * branch near this property rather than the same chain in another city.
+ */
+export function buildViewbox(origin: Coordinates, radiusM: number): string {
+  const latDelta = radiusM / 111_320;
+  // Longitude degrees shrink towards the poles, so scale by the latitude.
+  const lngDelta = radiusM / (111_320 * Math.max(0.1, Math.cos((origin.lat * Math.PI) / 180)));
+  return [origin.lng - lngDelta, origin.lat + latDelta, origin.lng + lngDelta, origin.lat - latDelta]
+    .map((v) => v.toFixed(6))
+    .join(",");
+}
+
 /** Full postal address string for geocoding, from the property's separate fields. */
 export function buildGeocodeQuery(property: {
   address?: string | null;
@@ -261,12 +275,11 @@ export async function geocodeAddress(query: string): Promise<GeocodeResult | nul
 }
 
 /**
- * Fetches points of interest around a point and shapes them into report-ready candidates.
- * Tries each Overpass mirror in turn — a busy or unreachable instance moves on to the next, and
- * only an all-mirrors failure surfaces to the technician.
+ * Runs one Overpass query, trying each mirror in turn — a busy or unreachable instance moves on to
+ * the next, and only an all-mirrors failure surfaces to the technician.
  */
-export async function fetchAmenities(origin: Coordinates): Promise<AmenityCandidate[]> {
-  const body = new URLSearchParams({ data: buildOverpassQuery(origin) }).toString();
+async function runOverpass(query: string): Promise<OverpassElement[]> {
+  const body = new URLSearchParams({ data: query }).toString();
   let lastStatus: number | null = null;
 
   for (const url of OVERPASS_URLS) {
@@ -283,7 +296,7 @@ export async function fetchAmenities(origin: Coordinates): Promise<AmenityCandid
 
     if (res.ok) {
       const parsed = (await res.json()) as { elements?: OverpassElement[] };
-      return buildCandidates(parsed.elements ?? [], origin);
+      return parsed.elements ?? [];
     }
     lastStatus = res.status;
   }
@@ -293,4 +306,82 @@ export async function fetchAmenities(origin: Coordinates): Promise<AmenityCandid
       ? "Služba OpenStreetMap je momentálne vyťažená. Skúste to znova o minútu."
       : `Načítanie okolia zlyhalo${lastStatus ? ` (HTTP ${lastStatus})` : ""}.`
   );
+}
+
+/** Fetches points of interest around a point and shapes them into report-ready candidates. */
+export async function fetchAmenities(origin: Coordinates): Promise<AmenityCandidate[]> {
+  return buildCandidates(await runOverpass(buildOverpassQuery(origin)), origin);
+}
+
+/**
+ * Candidates for one category only, searched wider and deeper than the report default so the
+ * technician can pick something the automatic list left out. `exclude` drops what they already
+ * have, so the picker never offers a duplicate.
+ */
+export async function fetchCategoryCandidates(
+  origin: Coordinates,
+  categoryKey: string,
+  exclude: string[] = []
+): Promise<AmenityCandidate[]> {
+  const base = AMENITY_CATEGORIES.find((c) => c.key === categoryKey);
+  if (!base) throw new AmenityLookupError("Neznáma kategória.");
+
+  // Twice the reporting radius and a high cap: this is a deliberate "show me more" action.
+  const widened: AmenityCategoryConfig = { ...base, radiusM: base.radiusM * 2, limit: 60 };
+  const elements = await runOverpass(buildOverpassQuery(origin, [widened]));
+
+  const taken = new Set(exclude.map((n) => n.trim().toLocaleLowerCase("sk")));
+  return buildCandidates(elements, origin, [widened]).filter(
+    (c) => !taken.has(c.name.trim().toLocaleLowerCase("sk"))
+  );
+}
+
+/**
+ * Finds a specific named place near the property — for when the technician knows what they want
+ * listed ("Kaufland", the particular surgery the client asked about) and it isn't in the automatic
+ * results. Bounded to a box around the property so it returns the local branch, not the same chain
+ * in another city.
+ */
+export async function searchAmenitiesByName(
+  origin: Coordinates,
+  query: string,
+  radiusM = 8000
+): Promise<Omit<AmenityCandidate, "category">[]> {
+  if (!query.trim()) return [];
+
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    limit: "10",
+    countrycodes: "sk",
+    viewbox: buildViewbox(origin, radiusM),
+    bounded: "1",
+    q: query,
+  });
+  const res = await fetchWithTimeout(`${NOMINATIM_URL}?${params}`, {
+    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+  });
+  if (!res.ok) throw new AmenityLookupError(`Vyhľadávanie zlyhalo (HTTP ${res.status}).`);
+
+  const results = (await res.json()) as { lat?: string; lon?: string; name?: string; display_name?: string }[];
+
+  return results
+    .map((r) => {
+      const lat = Number(r.lat);
+      const lng = Number(r.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      // Nominatim's display_name is a full address; its first part is the place itself.
+      const name = r.name?.trim() || r.display_name?.split(",")[0]?.trim();
+      if (!name) return null;
+      const distanceM = haversineMetres(origin, { lat, lng });
+      return {
+        name,
+        distanceM,
+        walkMinutes: walkMinutesFor(distanceM),
+        driveMinutes: driveMinutesFor(distanceM),
+        lat,
+        lng,
+      };
+    })
+    .filter((r): r is Omit<AmenityCandidate, "category"> => r !== null)
+    .sort((a, b) => a.distanceM - b.distanceM);
 }

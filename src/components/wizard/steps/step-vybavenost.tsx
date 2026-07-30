@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Lock, MapPin, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useInspectionContext } from "@/lib/inspection-context";
 import { apiPatch, apiPost, apiDelete, NetworkUnavailableError } from "@/lib/offline/api-client";
@@ -9,6 +9,11 @@ import { StepPageHeader, StepSection } from "@/components/wizard/step-section";
 import { InlineTextField } from "@/components/wizard/inline-field";
 import { NativeSelectField } from "@/components/wizard/native-select-field";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import {
+  AmenityCategoryAdd,
+  AmenityNameSearch,
+  type AmenityCandidate,
+} from "@/components/wizard/amenity-picker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -60,6 +65,50 @@ export function StepVybavenost() {
         ),
       (prev, created) => ({ ...prev, amenityPlaces: [...prev.amenityPlaces, created] })
     );
+  }
+
+  /** Adds a place the technician picked from a search result. */
+  async function addCandidate(candidate: AmenityCandidate, category: string) {
+    await create(
+      () =>
+        apiPost<FullAmenityPlace>(
+          `/api/inspections/${inspection.id}/amenity-places`,
+          {
+            category,
+            name: candidate.name,
+            distanceM: candidate.distanceM,
+            walkMinutes: candidate.walkMinutes,
+            driveMinutes: candidate.driveMinutes,
+            lat: candidate.lat,
+            lng: candidate.lng,
+            // Hand-picked, so a re-generation must not wipe it.
+            isManual: true,
+          },
+          "Miesto v okolí"
+        ),
+      (prev, created) => ({ ...prev, amenityPlaces: [...prev.amenityPlaces, created] })
+    );
+    toast.success(`„${candidate.name}“ pridané.`);
+  }
+
+  async function search(body: { query?: string; category?: string }): Promise<AmenityCandidate[]> {
+    try {
+      const result = await apiPost<{ candidates: AmenityCandidate[] }>(
+        `/api/inspections/${inspection.id}/amenities/search`,
+        body,
+        "Vyhľadávanie v okolí"
+      );
+      return result.candidates;
+    } catch (error) {
+      toast.error(
+        error instanceof NetworkUnavailableError
+          ? "Vyhľadávanie vyžaduje pripojenie na internet."
+          : error instanceof Error
+            ? error.message
+            : "Vyhľadávanie zlyhalo."
+      );
+      return [];
+    }
   }
 
   /** `regeocode` forces a fresh address lookup; a plain retry reuses the stored coordinates. */
@@ -178,6 +227,18 @@ export function StepVybavenost() {
         )}
       </StepSection>
 
+      {address && (
+        <StepSection
+          title="Nájsť konkrétne miesto"
+          description="Ak chcete do zoznamu doplniť niečo konkrétne, čo automatické vyhľadanie nenašlo."
+        >
+          <AmenityNameSearch
+            onSearch={(query) => search({ query })}
+            onAdd={(candidate, category) => void addCandidate(candidate, category)}
+          />
+        </StepSection>
+      )}
+
       {AMENITY_CATEGORIES.map((category) => {
         const items = places
           .filter((p) => p.category === category.key)
@@ -187,9 +248,12 @@ export function StepVybavenost() {
             key={category.key}
             title={`${category.label}${items.length > 0 ? ` (${items.length})` : ""}`}
             actions={
-              <Button size="sm" variant="outline" onClick={() => void addPlace(category.key)}>
-                <Plus /> Pridať
-              </Button>
+              <AmenityCategoryAdd
+                categoryKey={category.key}
+                onFind={(categoryKey) => search({ category: categoryKey })}
+                onAdd={(candidate, cat) => void addCandidate(candidate, cat)}
+                onAddBlank={() => void addPlace(category.key)}
+              />
             }
           >
             {items.length === 0 ? (
