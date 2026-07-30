@@ -10,6 +10,7 @@ import { StepZhrnutie } from "@/components/wizard/steps/step-zhrnutie";
 import { StepNaklady } from "@/components/wizard/steps/step-naklady";
 import { StepOdporucania } from "@/components/wizard/steps/step-odporucania";
 import { StepFoto } from "@/components/wizard/steps/step-foto";
+import { StepVybavenost } from "@/components/wizard/steps/step-vybavenost";
 import { StepVyhlasenie } from "@/components/wizard/steps/step-vyhlasenie";
 import { StepExport } from "@/components/wizard/steps/step-export";
 
@@ -22,6 +23,7 @@ const STEP_COMPONENTS: Record<WizardStepKey, React.ComponentType> = {
   naklady: StepNaklady,
   odporucania: StepOdporucania,
   foto: StepFoto,
+  vybavenost: StepVybavenost,
   vyhlasenie: StepVyhlasenie,
   export: StepExport,
 };

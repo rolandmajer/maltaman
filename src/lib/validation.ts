@@ -83,6 +83,7 @@ export const inspectionUpdateSchema = z.object({
   contingencyPercent: optionalNumber(),
   costsIncludeVat: z.boolean().optional(),
   costsEnteredInclVat: z.boolean().optional(),
+  amenitiesEnabled: z.boolean().optional(),
 });
 
 export const propertyUpdateSchema = z.object({
@@ -342,6 +343,26 @@ export const signatureSchema = z.object({
   imageDataUrl: z.string().nullable().optional(),
 });
 export const signatureUpdateSchema = signatureSchema.partial();
+
+// ---------------------------------------------------------------------------
+// Občianska vybavenosť — nearby amenities
+// ---------------------------------------------------------------------------
+
+export const amenityPlaceSchema = z.object({
+  category: z.string().min(1),
+  // No min-length: a manually added row starts empty and is named inline, as elsewhere.
+  name: z.string().optional().default(""),
+  distanceM: z.coerce.number().int().nonnegative().default(0),
+  walkMinutes: z.coerce.number().int().nonnegative().nullable().optional(),
+  driveMinutes: z.coerce.number().int().nonnegative().nullable().optional(),
+  lat: z.coerce.number().nullable().optional(),
+  lng: z.coerce.number().nullable().optional(),
+  note: z.string().optional(),
+  isManual: z.boolean().optional(),
+  includeInReport: z.boolean().optional(),
+  order: z.number().int().optional(),
+});
+export const amenityPlaceUpdateSchema = amenityPlaceSchema.partial();
 
 // ---------------------------------------------------------------------------
 // Settings

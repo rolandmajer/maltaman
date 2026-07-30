@@ -146,6 +146,16 @@ model Inspection {
   // item are gross and the net + VAT are derived from them — for quotes given "s DPH".
   costsEnteredInclVat Boolean @default(false)
 
+  // step 9 — občianska vybavenosť (paid add-on; the step is locked until switched on)
+  amenitiesEnabled     Boolean   @default(false)
+  amenitiesGeneratedAt DateTime?
+  /// Geocoded property coordinates, kept so the list can be regenerated without re-geocoding.
+  amenitiesLat         Float?
+  amenitiesLng         Float?
+  /// The place the geocoder actually matched, shown so a wrong match (a loose address can land in
+  /// a neighbouring village) is visible rather than silently skewing the whole section.
+  amenitiesLocationLabel String @default("")
+
   // revisions
   revisionNumber     Int          @default(1)
   parentInspectionId String?
@@ -168,9 +178,42 @@ model Inspection {
   recommendations Recommendation[]
   signatures      Signature[]
   reportRevisions ReportRevision[]
+  amenityPlaces   AmenityPlace[]
 
   @@unique([organisationId, protocolNumber])
   @@index([organisationId, status])
+}
+
+/// One nearby place in the "Občianska vybavenosť" section — a school, shop, stop, park…
+/// Rows are generated from the property address via OpenStreetMap, but the technician can add
+/// their own (isManual) and those survive a re-generation.
+model AmenityPlace {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  category String // key into AMENITY_CATEGORIES
+  name     String
+
+  /// Straight-line metres from the property. Real walking distance is longer — the minute
+  /// estimates below apply a detour factor, see src/lib/amenities.ts.
+  distanceM    Int
+  walkMinutes  Int?
+  driveMinutes Int?
+
+  lat Float?
+  lng Float?
+
+  note            String  @default("")
+  isManual        Boolean @default(false)
+  includeInReport Boolean @default(true)
+  order           Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([inspectionId])
+  @@index([inspectionId, category])
 }
 
 model Property {

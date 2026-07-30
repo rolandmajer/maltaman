@@ -14,6 +14,8 @@ import {
   recommendationUpdateSchema,
   signatureSchema,
   signatureUpdateSchema,
+  amenityPlaceSchema,
+  amenityPlaceUpdateSchema,
 } from "@/lib/validation";
 import type { ZodType } from "zod";
 
@@ -65,6 +67,12 @@ export const RESOURCE_MAP: Record<string, ResourceConfig> = {
     createSchema: signatureSchema,
     updateSchema: signatureUpdateSchema,
     orderBy: { createdAt: "asc" },
+  },
+  "amenity-places": {
+    delegate: delegateFor(db.amenityPlace),
+    createSchema: amenityPlaceSchema,
+    updateSchema: amenityPlaceUpdateSchema,
+    orderBy: { distanceM: "asc" },
   },
 };
 

@@ -11,6 +11,9 @@ export function computeStepCompletion(inspection: FullInspection): Record<Wizard
     naklady: inspection.costItems.length > 0,
     odporucania: inspection.recommendations.length > 0,
     foto: inspection.photos.length > 0,
+    // Paid add-on: "done" means switched off (deliberately not sold) or switched on and populated.
+    // Never left showing as outstanding work for a protocol that simply doesn't include it.
+    vybavenost: !inspection.amenitiesEnabled || inspection.amenityPlaces.length > 0,
     vyhlasenie: inspection.signatures.some((s) => s.role === "TECHNICIAN" && s.imageDataUrl),
     export: inspection.status === "COMPLETED",
   };

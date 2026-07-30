@@ -41,6 +41,7 @@ export const INSPECTION_FULL_INCLUDE = {
   costItems: { orderBy: { order: "asc" as const } },
   recommendations: { orderBy: { order: "asc" as const } },
   signatures: true,
+  amenityPlaces: { orderBy: { distanceM: "asc" as const } },
   reportRevisions: { orderBy: { createdAt: "asc" as const } },
   createdBy: { select: { id: true, name: true, registrationNumber: true } },
 } as const;
@@ -147,6 +148,11 @@ export async function duplicateInspectionDeep(sourceId: string, createdById: str
         contingencyPercent: source.contingencyPercent,
         costsIncludeVat: source.costsIncludeVat,
         costsEnteredInclVat: source.costsEnteredInclVat,
+        amenitiesEnabled: source.amenitiesEnabled,
+        amenitiesGeneratedAt: source.amenitiesGeneratedAt,
+        amenitiesLat: source.amenitiesLat,
+        amenitiesLng: source.amenitiesLng,
+        amenitiesLocationLabel: source.amenitiesLocationLabel,
         property: source.property
           ? { create: { ...stripId(source.property) } }
           : { create: {} },
@@ -242,6 +248,27 @@ export async function duplicateInspectionDeep(sourceId: string, createdById: str
           presentTo: p.presentTo,
           note: p.note,
           order: p.order,
+        },
+      });
+    }
+
+    // The property (and therefore the location) is copied verbatim, so the amenities still apply —
+    // carrying them over saves re-running the lookup against OpenStreetMap for the same address.
+    for (const place of source.amenityPlaces) {
+      await tx.amenityPlace.create({
+        data: {
+          inspectionId: inspection.id,
+          category: place.category,
+          name: place.name,
+          distanceM: place.distanceM,
+          walkMinutes: place.walkMinutes,
+          driveMinutes: place.driveMinutes,
+          lat: place.lat,
+          lng: place.lng,
+          note: place.note,
+          isManual: place.isManual,
+          includeInReport: place.includeInReport,
+          order: place.order,
         },
       });
     }

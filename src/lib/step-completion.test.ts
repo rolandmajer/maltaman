@@ -16,6 +16,8 @@ function baseInspection(): FullInspection {
     recommendations: [],
     photos: [],
     signatures: [],
+    amenitiesEnabled: false,
+    amenityPlaces: [],
     status: "DRAFT",
   } as unknown as FullInspection;
 }
@@ -23,7 +25,28 @@ function baseInspection(): FullInspection {
 describe("computeStepCompletion", () => {
   it("marks every step incomplete for a freshly created inspection", () => {
     const completion = computeStepCompletion(baseInspection());
-    expect(Object.values(completion).every((v) => v === false)).toBe(true);
+    // vybavenost is the one exception: it is a paid add-on, so while it is switched off there is
+    // no outstanding work to flag. See the amenities cases below.
+    const { vybavenost, ...rest } = completion;
+    expect(vybavenost).toBe(true);
+    expect(Object.values(rest).every((v) => v === false)).toBe(true);
+  });
+
+  it("counts vybavenost as done while the add-on is switched off", () => {
+    expect(computeStepCompletion(baseInspection()).vybavenost).toBe(true);
+  });
+
+  it("marks vybavenost outstanding once the add-on is switched on but still empty", () => {
+    const inspection = baseInspection();
+    inspection.amenitiesEnabled = true;
+    expect(computeStepCompletion(inspection).vybavenost).toBe(false);
+  });
+
+  it("marks vybavenost complete once places have been found", () => {
+    const inspection = baseInspection();
+    inspection.amenitiesEnabled = true;
+    inspection.amenityPlaces = [{ id: "a" }] as never;
+    expect(computeStepCompletion(inspection).vybavenost).toBe(true);
   });
 
   it("marks zakladne-udaje complete once a date and address exist", () => {

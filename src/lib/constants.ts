@@ -10,6 +10,9 @@ export const WIZARD_STEPS = [
   { key: "naklady", label: "Odhad nákladov" },
   { key: "odporucania", label: "Odporúčania" },
   { key: "foto", label: "Fotodokumentácia" },
+  // Paid add-on, and a desk task rather than an on-site one — placed near the end so the
+  // familiar on-site order of the first steps is untouched.
+  { key: "vybavenost", label: "Občianska vybavenosť" },
   { key: "vyhlasenie", label: "Vyhlásenie a podpisy" },
   { key: "export", label: "Kontrola a export" },
 ] as const;
@@ -360,6 +363,107 @@ export const CONDITION_RECOMMENDED_ACTION_PRESETS = [
 // "Odporúčaný špecialista" options — used by the Technický stav points, where the technician
 // hands a finding off to a trade. Shared preset category, so values learned in one inspection
 // are offered in the next.
+// ---------------------------------------------------------------------------
+// Občianska vybavenosť — nearby amenities, generated from the property address
+// ---------------------------------------------------------------------------
+
+/**
+ * The categories reported for a property's surroundings, in report order.
+ *
+ * `tags` are OpenStreetMap key/value filters. Each entry becomes one Overpass clause, so a
+ * category can span several OSM tags (a shop can be tagged shop=supermarket or shop=convenience).
+ * `limit` caps how many of the nearest hits are kept, so the report stays readable rather than
+ * listing every bus stop in town. `radiusM` is per category because a bus stop 3 km away is
+ * irrelevant while a hospital 8 km away still matters.
+ */
+export type AmenityCategoryConfig = {
+  key: string;
+  label: string;
+  tags: { key: string; values: string[] }[];
+  radiusM: number;
+  limit: number;
+};
+
+export const AMENITY_CATEGORIES: AmenityCategoryConfig[] = [
+  {
+    key: "skolstvo",
+    label: "Školy a školstvo",
+    tags: [{ key: "amenity", values: ["school", "college", "university"] }],
+    radiusM: 3000,
+    limit: 5,
+  },
+  {
+    key: "skolky",
+    label: "Materské školy a jasle",
+    tags: [{ key: "amenity", values: ["kindergarten", "childcare"] }],
+    radiusM: 2000,
+    limit: 4,
+  },
+  {
+    key: "obchody",
+    label: "Obchody a nákupy",
+    tags: [
+      { key: "shop", values: ["supermarket", "convenience", "grocery", "bakery", "butcher", "greengrocer"] },
+      { key: "amenity", values: ["marketplace"] },
+    ],
+    radiusM: 2000,
+    limit: 6,
+  },
+  {
+    key: "zdravotnictvo",
+    label: "Zdravotná starostlivosť",
+    tags: [
+      { key: "amenity", values: ["pharmacy", "doctors", "dentist", "clinic", "hospital"] },
+      { key: "healthcare", values: ["centre", "doctor"] },
+    ],
+    radiusM: 5000,
+    limit: 6,
+  },
+  {
+    key: "doprava",
+    label: "Doprava a spoje",
+    tags: [
+      { key: "highway", values: ["bus_stop"] },
+      { key: "railway", values: ["station", "halt", "tram_stop"] },
+      { key: "amenity", values: ["bus_station"] },
+    ],
+    radiusM: 1500,
+    limit: 5,
+  },
+  {
+    key: "volny_cas",
+    label: "Parky, šport a voľný čas",
+    tags: [
+      { key: "leisure", values: ["park", "playground", "sports_centre", "pitch", "fitness_centre", "swimming_pool"] },
+    ],
+    radiusM: 2000,
+    limit: 6,
+  },
+  {
+    key: "sluzby",
+    label: "Služby a úrady",
+    tags: [
+      { key: "amenity", values: ["bank", "atm", "post_office", "police", "fire_station", "townhall", "library"] },
+    ],
+    radiusM: 3000,
+    limit: 6,
+  },
+  {
+    key: "gastro",
+    label: "Restaurácie a kaviarne",
+    tags: [{ key: "amenity", values: ["restaurant", "cafe", "fast_food", "pub", "bar"] }],
+    radiusM: 1500,
+    limit: 5,
+  },
+];
+
+export const AMENITY_CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  AMENITY_CATEGORIES.map((c) => [c.key, c.label])
+);
+
+/** Shown in the report — OpenStreetMap's licence requires the source to be credited. */
+export const AMENITY_ATTRIBUTION = "Údaje o okolí: © OpenStreetMap contributors (ODbL).";
+
 export const RECOMMENDED_SPECIALIST_PRESETS = [
   "Statik",
   "Elektrikár",

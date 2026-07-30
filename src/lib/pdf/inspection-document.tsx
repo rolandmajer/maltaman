@@ -15,6 +15,8 @@ import {
   ELEMENT_STATUS_SHORT,
   CONDITION_DEADLINE_LABELS,
   ROOM_ELEMENT_ADDITIONAL_CONFIG,
+  AMENITY_CATEGORIES,
+  AMENITY_ATTRIBUTION,
 } from "@/lib/constants";
 import { parseJsonStringArray, formatAttributeValue } from "@/lib/element-description";
 import type { FullInspection, FullFinding } from "@/types/inspection";
@@ -754,6 +756,78 @@ function DeclarationsPage({ inspection, settings }: Props) {
 }
 
 // ---------------------------------------------------------------------------
+// Občianska vybavenosť (paid add-on)
+// ---------------------------------------------------------------------------
+
+/**
+ * Appended last and numbered 13 deliberately: the section is optional, so placing it earlier would
+ * leave a gap in the hard-coded section numbering of every report that doesn't include it.
+ */
+function AmenitiesPage({ inspection, settings }: Props) {
+  if (!inspection.amenitiesEnabled) return null;
+
+  const included = inspection.amenityPlaces.filter((p) => p.includeInReport && p.name.trim());
+  if (included.length === 0) return null;
+
+  const byCategory = AMENITY_CATEGORIES.map((category) => ({
+    label: category.label,
+    places: included
+      .filter((p) => p.category === category.key)
+      .sort((a, b) => a.distanceM - b.distanceM),
+  })).filter((group) => group.places.length > 0);
+
+  const formatDistance = (metres: number) =>
+    metres >= 1000 ? `${(metres / 1000).toFixed(1).replace(".", ",")} km` : `${metres} m`;
+
+  const formatTimes = (walk: number | null, drive: number | null) =>
+    [walk != null ? `pešo ${walk} min` : null, drive != null ? `autom ${drive} min` : null]
+      .filter(Boolean)
+      .join(" · ") || "—";
+
+  return (
+    <Page size="A4" style={styles.page}>
+      <HeaderFooter inspection={inspection} settings={settings} />
+      <Text style={styles.sectionTitle}>13. Občianska vybavenosť v okolí</Text>
+      <Text style={[styles.paragraph, styles.muted]}>
+        Prehľad služieb a zariadení v okolí nehnuteľnosti. Vzdialenosti sú uvedené vzdušnou líniou,
+        časy sú orientačným odhadom vrátane prirážky na skutočnú trasu.
+      </Text>
+
+      {byCategory.map((group) => (
+        <View key={group.label} style={{ marginTop: 10 }} wrap={false}>
+          <Text style={styles.subTitle}>{group.label}</Text>
+          <View style={styles.table}>
+            <View style={styles.tableHeaderRow}>
+              <Text style={[styles.th, { width: "52%" }]}>Miesto</Text>
+              <Text style={[styles.th, { width: "16%" }]}>Vzdialenosť</Text>
+              <Text style={[styles.th, { width: "32%" }]}>Čas</Text>
+            </View>
+            {group.places.map((place, i, arr) => (
+              <View
+                key={place.id}
+                style={i === arr.length - 1 ? styles.tableRowLast : styles.tableRow}
+                wrap={false}
+              >
+                <Text style={[styles.td, { width: "52%" }]}>
+                  {place.name}
+                  {place.note ? ` — ${place.note}` : ""}
+                </Text>
+                <Text style={[styles.td, { width: "16%" }]}>{formatDistance(place.distanceM)}</Text>
+                <Text style={[styles.td, { width: "32%" }]}>
+                  {formatTimes(place.walkMinutes, place.driveMinutes)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+
+      <Text style={[styles.paragraph, styles.muted, { marginTop: 14 }]}>{AMENITY_ATTRIBUTION}</Text>
+    </Page>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Root document
 // ---------------------------------------------------------------------------
 
@@ -769,6 +843,7 @@ export function InspectionDocument(props: Props) {
       <RecommendationsPage {...props} />
       <PhotoDocumentationPages {...props} />
       <DeclarationsPage {...props} />
+      <AmenitiesPage {...props} />
     </Document>
   );
 }

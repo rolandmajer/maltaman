@@ -16,6 +16,7 @@ export type FullPhoto = FullInspection["photos"][number];
 export type FullParticipant = FullInspection["participants"][number];
 export type FullRecommendation = FullInspection["recommendations"][number];
 export type FullSignature = FullInspection["signatures"][number];
+export type FullAmenityPlace = FullInspection["amenityPlaces"][number];
 
 export type InspectionListItem = Prisma.InspectionGetPayload<{
   include: {
