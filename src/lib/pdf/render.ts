@@ -59,12 +59,23 @@ export async function renderInspectionPdf(inspectionId: string): Promise<Buffer>
     }
   }
 
+  // The cover is a solid red panel, so it needs the wordmark knocked out to white. react-pdf has no
+  // equivalent of the design's CSS filter, so the white variant is a separate asset. An org logo we
+  // have never seen cannot be recoloured safely, so those keep their own artwork on the red.
+  let logoWhiteBuffer: Buffer | undefined;
+  try {
+    logoWhiteBuffer = settings?.logoUrl ? logoBuffer : await readFile(path.join(process.cwd(), "public/logo-white.png"));
+  } catch {
+    logoWhiteBuffer = logoBuffer;
+  }
+
   const element = React.createElement(InspectionDocument, {
     inspection,
     settings,
     totals,
     photoBuffers,
     logoBuffer,
+    logoWhiteBuffer,
   });
 
   return renderToBuffer(element as Parameters<typeof renderToBuffer>[0]);

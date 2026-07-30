@@ -1,193 +1,253 @@
 import { StyleSheet } from "@react-pdf/renderer";
 
-// Grayscale-safe palette: headings/borders stay legible printed in black & white.
+/**
+ * Palette from the protocol design. Warm neutrals rather than blue-greys, so the paper stock and
+ * the brand red sit together; the red is the only saturated colour and is reserved for section
+ * numbers, defects and the figures the client is meant to act on.
+ */
 export const colors = {
-  ink: "#101828",
-  muted: "#475467",
-  faint: "#98A2B3",
-  border: "#D0D5DD",
-  headerBg: "#FBEFEF",
-  brand: "#832321",
-  ok: "#1C7A3B",
-  v: "#B45309",
-  r: "#B91C1C",
-  n: "#667085",
+  brand: "#c53835",
+  brandDark: "#9e2b28",
+  brandWash: "#fbeceb",
+  brandWashBorder: "#e6b3af",
+  /** Divider on the red cover. The design uses rgba white; react-pdf does not parse rgba() and
+   *  rendered it as a stray green, so this is the same value flattened against the brand red. */
+  brandHairline: "#d1615e",
+
+  ink: "#201d1b",
+  body: "#3a3330",
+  muted: "#6f6862",
+  faint: "#a49d96",
+  fainter: "#8b847d",
+
+  border: "#e7e2dc",
+  line: "#efeae4",
+  lineSoft: "#f1ece6",
+  surface: "#faf7f3",
+  surfaceAlt: "#f6f3ef",
+
+  // Evaluation chips — text / fill / edge per status.
+  okText: "#2f7a4f",
+  okFill: "#e7f2ea",
+  okEdge: "#bfe0cd",
+  okBar: "#3f8f5f",
+
+  vText: "#c53835",
+  vFill: "#fbe9e8",
+  vEdge: "#f0c4c1",
+
+  rText: "#b07d1f",
+  rFill: "#f8efdb",
+  rEdge: "#ecd9a8",
+
+  nText: "#7c756e",
+  nFill: "#f0edea",
+  nEdge: "#ddd7d0",
+  nBar: "#9a938c",
+
+  naText: "#a49d96",
+  naFill: "#f4f1ed",
+  naEdge: "#e4ded7",
+
+  // On the dark appendix headers the chips have to lift off near-black instead of off-white.
+  onDarkOk: "#7ee0a8",
+  onDarkV: "#f3a9a5",
+  onDarkMuted: "#c9c3bc",
+
+  amber: "#c98a2b",
+  white: "#ffffff",
 };
+
+/** Chip colours for an element/finding status code. */
+export function statusChip(status: string) {
+  if (status === "OK") return { color: colors.okText, backgroundColor: colors.okFill, borderColor: colors.okEdge };
+  if (status === "V") return { color: colors.vText, backgroundColor: colors.vFill, borderColor: colors.vEdge };
+  if (status === "R") return { color: colors.rText, backgroundColor: colors.rFill, borderColor: colors.rEdge };
+  if (status === "NEVZTAHUJE_SA" || status === "N/A")
+    return { color: colors.naText, backgroundColor: colors.naFill, borderColor: colors.naEdge };
+  return { color: colors.nText, backgroundColor: colors.nFill, borderColor: colors.nEdge };
+}
+
+/** Kept for callers that only need the ink colour of a status. */
+export function statusColor(status: string) {
+  return statusChip(status).color;
+}
 
 export const styles = StyleSheet.create({
   page: {
-    fontFamily: "Noto Sans",
+    fontFamily: "Plex",
     fontSize: 9,
+    lineHeight: 1.5,
     color: colors.ink,
-    paddingTop: 56,
+    paddingTop: 40,
     paddingBottom: 40,
-    paddingHorizontal: 36,
+    paddingHorizontal: 43,
   },
   coverPage: {
-    fontFamily: "Noto Sans",
+    fontFamily: "Plex",
     color: colors.ink,
-    padding: 48,
-    display: "flex",
-    flexDirection: "column",
-    height: "100%",
+    padding: 0,
   },
-  header: {
-    position: "absolute",
-    top: 16,
-    left: 36,
-    right: 36,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    fontSize: 8,
-    color: colors.muted,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingBottom: 6,
-  },
+
   footer: {
     position: "absolute",
-    bottom: 16,
-    left: 36,
-    right: 36,
+    bottom: 20,
+    left: 43,
+    right: 43,
     flexDirection: "row",
     justifyContent: "space-between",
-    fontSize: 8,
-    color: colors.muted,
+    alignItems: "center",
+    fontSize: 7.5,
+    fontFamily: "PlexMono",
+    color: colors.faint,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingTop: 6,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: colors.brand,
-    marginBottom: 8,
-    marginTop: 14,
+
+  // ---- section heading rule ------------------------------------------------
+  sectionHead: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    borderBottomWidth: 2,
+    borderBottomColor: colors.ink,
+    paddingBottom: 7,
+    marginBottom: 14,
   },
-  subTitle: {
-    fontSize: 10.5,
-    fontWeight: "bold",
+  sectionNumber: {
+    fontFamily: "Archivo",
+    fontWeight: 900,
+    fontSize: 14,
+    color: colors.brand,
+    marginRight: 9,
+  },
+  sectionTitle: {
+    fontFamily: "Archivo",
+    fontWeight: 800,
+    fontSize: 14.5,
     color: colors.ink,
-    marginBottom: 4,
-    marginTop: 8,
+  },
+  sectionAside: {
+    marginLeft: "auto",
+    fontSize: 8,
+    color: colors.muted,
+  },
+
+  // ---- generic type --------------------------------------------------------
+  eyebrow: {
+    fontFamily: "PlexMono",
+    fontWeight: 700,
+    fontSize: 7.5,
+    letterSpacing: 0.7,
+    color: colors.brand,
+    marginBottom: 7,
+  },
+  eyebrowMuted: {
+    fontFamily: "PlexMono",
+    fontWeight: 700,
+    fontSize: 7.5,
+    letterSpacing: 0.7,
+    color: colors.muted,
+    marginBottom: 7,
   },
   paragraph: {
-    fontSize: 9,
-    color: colors.ink,
-    lineHeight: 1.4,
-    marginBottom: 4,
+    fontSize: 8.8,
+    color: colors.body,
+    lineHeight: 1.5,
   },
-  muted: {
+  note: {
+    fontSize: 8,
     color: colors.muted,
+    lineHeight: 1.45,
   },
-  table: {
-    width: "100%",
+  mono: {
+    fontFamily: "PlexMono",
+  },
+
+  // ---- cards ---------------------------------------------------------------
+  card: {
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: 8,
+    borderRadius: 9,
+    padding: 12,
   },
-  tableRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  cardSurface: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 9,
+    padding: 12,
+    backgroundColor: colors.surface,
   },
-  tableRowLast: {
-    flexDirection: "row",
+
+  // ---- chips ---------------------------------------------------------------
+  chip: {
+    fontFamily: "PlexMono",
+    fontWeight: 700,
+    fontSize: 6.6,
+    borderWidth: 1,
+    borderRadius: 3,
+    paddingVertical: 1.5,
+    paddingHorizontal: 3.5,
+    textAlign: "center",
   },
-  tableHeaderRow: {
-    flexDirection: "row",
-    backgroundColor: colors.headerBg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  th: {
-    padding: 4,
-    fontSize: 8,
-    fontWeight: "bold",
-    color: colors.ink,
-  },
-  td: {
-    padding: 4,
-    fontSize: 8.5,
-    color: colors.ink,
-  },
-  labelCell: {
-    width: "34%",
-    padding: 4,
-    fontSize: 8.5,
-    color: colors.muted,
-    backgroundColor: colors.headerBg,
-  },
-  valueCell: {
-    width: "66%",
-    padding: 4,
-    fontSize: 8.5,
-    color: colors.ink,
-  },
+
+  // ---- key/value rows ------------------------------------------------------
   kvRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.line,
+    paddingVertical: 4,
   },
-  badge: {
-    fontSize: 7.5,
-    fontWeight: "bold",
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderRadius: 2,
-    textAlign: "center",
-  },
-  legendRow: {
+  kvRowLast: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 3,
-    gap: 6,
+    paddingVertical: 4,
   },
-  photoGrid: {
+  kvLabel: {
+    width: "47%",
+    fontSize: 8.5,
+    color: colors.muted,
+  },
+  kvValue: {
+    width: "53%",
+    fontSize: 8.5,
+    fontWeight: 600,
+    color: colors.ink,
+  },
+
+  // ---- tables --------------------------------------------------------------
+  th: {
+    fontFamily: "PlexMono",
+    fontWeight: 700,
+    fontSize: 6.8,
+    letterSpacing: 0.5,
+    color: colors.white,
+    paddingVertical: 6,
+    paddingHorizontal: 7,
+  },
+  td: {
+    fontSize: 8.3,
+    color: colors.ink,
+    paddingVertical: 6,
+    paddingHorizontal: 7,
+  },
+  tableRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    alignItems: "flex-start",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
   },
+
+  // ---- photos --------------------------------------------------------------
   photoCard: {
-    width: "31%",
-    marginBottom: 10,
+    width: "31.7%",
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: 8,
+    overflow: "hidden",
   },
   photoImage: {
     width: "100%",
-    height: 110,
+    height: 104,
     objectFit: "cover",
   },
-  photoCaption: {
-    fontSize: 7.5,
-    padding: 4,
-    color: colors.ink,
-  },
-  signatureBlock: {
-    width: "48%",
-    borderTopWidth: 1,
-    borderTopColor: colors.ink,
-    marginTop: 40,
-    paddingTop: 4,
-  },
-  coverTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: colors.brand,
-    marginTop: 24,
-  },
-  coverSubtitle: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 4,
-  },
 });
-
-export function statusColor(status: string) {
-  if (status === "OK") return colors.ok;
-  if (status === "V") return colors.v;
-  if (status === "R") return colors.r;
-  return colors.n;
-}

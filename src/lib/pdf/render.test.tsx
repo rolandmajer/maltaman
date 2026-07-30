@@ -2,6 +2,9 @@ import { describe, it, expect, afterAll } from "vitest";
 import { PDFParse } from "pdf-parse";
 import { renderToBuffer, Document, Page, Text } from "@react-pdf/renderer";
 import { db } from "@/lib/db";
+import { getFullInspection } from "@/lib/inspection-service";
+import { computeCostItem, computeCostTotals } from "@/lib/calculations";
+import { formatCurrency } from "@/lib/format";
 import { renderInspectionPdf } from "./render";
 import { ensureFontsRegistered } from "./fonts";
 import { styles } from "./styles";
@@ -53,8 +56,64 @@ describe("renderInspectionPdf", () => {
     const buffer = await renderInspectionPdf(inspection!.id);
     const parsed = await new PDFParse({ data: buffer }).getText();
 
-    expect(parsed.text).toContain("PROTOKOL Z OBHLIADKY NEHNUTEĽNOSTI");
-    expect(parsed.text).toContain("Legenda hodnotenia");
-    expect(parsed.text).toContain("Vyhlásenie, obmedzenia a podpisy");
+    // Tracked-out labels come back from the extractor with a space between every glyph
+    // ("P R O T O K O L"), which is how letterSpacing is encoded. Dropping whitespace on both
+    // sides sidesteps it — a targeted un-spacing regex cannot tell that apart from the real space
+    // around the one-letter Slovak word "z".
+    const squashed = parsed.text.replace(/\s+/g, "");
+    const contains = (phrase: string) => expect(squashed).toContain(phrase.replace(/\s+/g, ""));
+
+    contains("PROTOKOL Z OBHLIADKY");
+    contains("Súhrn protokolu");
+    contains("Identifikácia a podmienky");
+    contains("LEGENDA HODNOTENIA");
+    contains("Obhliadka po miestnostiach");
+    contains("Zistené vady a riziká");
+    contains("Odhad nákladov na obnovu");
+    contains("Odporúčania a záver");
+    contains("VYHLÁSENIE A OBMEDZENIA");
+    contains("Príloha — kompletná obhliadka po miestnostiach");
+  });
+
+  it("numbers the sections consecutively, with no gap for an omitted optional section", async () => {
+    // Photos and Občianska vybavenosť only appear when they have content. The numbers used to be
+    // hard-coded, so a report without them printed 11, 13 and skipped 12.
+    const inspection = await db.inspection.findFirst({ orderBy: { createdAt: "asc" } });
+    const buffer = await renderInspectionPdf(inspection!.id);
+    const parsed = await new PDFParse({ data: buffer }).getText();
+
+    const numbers = [...parsed.text.matchAll(/^(\d{2})\s/gm)].map((m) => Number(m[1]));
+    const sectionNumbers = [...new Set(numbers)].filter((n) => n >= 1 && n <= 12).sort((a, b) => a - b);
+
+    expect(sectionNumbers[0]).toBe(1);
+    expect(sectionNumbers).toEqual(sectionNumbers.map((_, i) => i + 1));
+  });
+
+  it("prints the cost totals that the cost module computed", async () => {
+    const inspection = await db.inspection.findFirst({ orderBy: { createdAt: "asc" } });
+    const buffer = await renderInspectionPdf(inspection!.id);
+    const parsed = await new PDFParse({ data: buffer }).getText();
+    const text = parsed.text.replace(/ | /g, " ");
+
+    const full = await getFullInspection(inspection!.id);
+    const totals = computeCostTotals(
+      full!.costItems.map((item) => ({
+        id: item.id,
+        categoryId: item.categoryId,
+        categoryName: "",
+        roomId: item.roomId,
+        roomName: null,
+        priority: item.priority,
+        included: item.included,
+        ...computeCostItem(item, full!.costsEnteredInclVat),
+      })),
+      full!.contingencyPercent
+    );
+
+    // Formatted the same way the document formats them, so this catches a total that silently
+    // stops matching the module it came from.
+    for (const value of [totals.totalExclVat, totals.totalInclVat, totals.finalTotalWithContingency]) {
+      expect(text).toContain(formatCurrency(value).replace(/ | /g, " "));
+    }
   });
 });
