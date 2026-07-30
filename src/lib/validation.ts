@@ -197,9 +197,12 @@ export const findingSchema = z.object({
 export const findingUpdateSchema = findingSchema.partial();
 
 export const measurementSchema = z.object({
-  label: z.string().min(1),
-  value: z.coerce.number(),
-  unit: z.string().min(1),
+  // No min-length: a measurement row is created blank and then filled in inline, so the create
+  // call legitimately posts empty strings — requiring content here made "+ Pridať meranie" fail
+  // with a 400 and add nothing. Same pattern as recommendationSchema.text.
+  label: z.string().optional().default(""),
+  value: z.coerce.number().optional().default(0),
+  unit: z.string().optional().default(""),
   note: z.string().optional(),
   order: z.number().int().optional(),
 });

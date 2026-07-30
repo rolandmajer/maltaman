@@ -76,6 +76,72 @@ describe("InlineTextField", () => {
     expect((input as HTMLInputElement).value).toBe("");
   });
 
+  it("never sends an empty value for a required field", async () => {
+    // The reported "opravy stien mi vymazáva": clearing a name to retype it committed "", the API
+    // answered 400, and applyAndSave refetched the whole inspection — wiping the edit in progress.
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    render(<InlineTextField label="Názov" value="Nová položka" onCommit={onCommit} required />);
+
+    const input = screen.getByLabelText("Názov");
+    await user.clear(input);
+    await user.keyboard("{Enter}");
+
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("saves a required field once it has content again", async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    render(<InlineTextField label="Názov" value="Nová položka" onCommit={onCommit} required />);
+
+    const input = screen.getByLabelText("Názov");
+    await user.clear(input);
+    await user.type(input, "Opravy stien{Enter}");
+
+    expect(onCommit).toHaveBeenCalledWith("Opravy stien");
+  });
+
+  it("restores the previous value when a required field is left blank", async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    render(
+      <>
+        <InlineTextField label="Názov" value="Opravy stien" onCommit={onCommit} required />
+        <button>inde</button>
+      </>
+    );
+
+    const input = screen.getByLabelText("Názov");
+    await user.clear(input);
+    await user.click(screen.getByRole("button", { name: "inde" }));
+
+    expect((input as HTMLInputElement).value).toBe("Opravy stien");
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("does not flush a blank required value on unmount", async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    const { unmount } = render(<InlineTextField label="Názov" value="Opravy stien" onCommit={onCommit} required />);
+
+    await user.clear(screen.getByLabelText("Názov"));
+    unmount();
+
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("still allows clearing a field that is not required", async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    render(<InlineTextField label="Poznámka" value="text" onCommit={onCommit} />);
+
+    await user.clear(screen.getByLabelText("Poznámka"));
+    await user.keyboard("{Enter}");
+
+    expect(onCommit).toHaveBeenCalledWith("");
+  });
+
   it("still picks up an external change when the field is not being edited", async () => {
     const onCommit = vi.fn();
     const { rerender } = render(<InlineTextField label="Cena" value="10" onCommit={onCommit} />);

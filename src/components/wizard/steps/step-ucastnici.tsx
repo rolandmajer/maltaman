@@ -82,6 +82,7 @@ export function StepUcastnici() {
                 <InlineTextField
                   label="Meno a priezvisko"
                   value={participant.fullName}
+                  required
                   onCommit={(v) => updateParticipant(participant.id, { fullName: v })}
                 />
                 <InlineTextField

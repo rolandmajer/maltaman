@@ -118,7 +118,7 @@ export function RoomCard({
       {open && (
         <div className="border-t border-slate-100 p-3">
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <InlineTextField label="Názov miestnosti" value={room.name} onCommit={(v) => onUpdate({ name: v })} />
+            <InlineTextField label="Názov miestnosti" value={room.name} required onCommit={(v) => onUpdate({ name: v })} />
             <RoomTypeSelect value={room.type} onChange={(v) => onUpdate({ type: v })} />
             <InlineTextField label="Podlažie" value={room.floorLevel} onCommit={(v) => onUpdate({ floorLevel: v })} />
             <div className="grid grid-cols-3 gap-2">

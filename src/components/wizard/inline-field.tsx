@@ -14,6 +14,7 @@ export function InlineTextField({
   className,
   type = "text",
   placeholder,
+  required,
 }: {
   label?: string;
   value: string;
@@ -21,6 +22,13 @@ export function InlineTextField({
   className?: string;
   type?: string;
   placeholder?: string;
+  /**
+   * Set for fields the server rejects when blank (names, labels). Clearing such a field to retype
+   * it used to commit "" mid-edit, the API answered 400, and applyAndSave reacted by refetching the
+   * whole inspection — which wiped whatever was being typed and read as the app deleting the text.
+   * With this set, an empty value is never sent, and blurring while empty restores what was there.
+   */
+  required?: boolean;
 }) {
   const [local, setLocal] = useState(value);
   const [syncedValue, setSyncedValue] = useState(value);
@@ -49,9 +57,12 @@ export function InlineTextField({
     };
   }, []);
 
+  /** A required field must never be saved blank — see the `required` prop. */
+  const isBlocked = (next: string) => Boolean(required) && next.trim() === "";
+
   function handleChange(next: string) {
     setLocal(next);
-    pendingRef.current = { value: next, commit: onCommit };
+    pendingRef.current = isBlocked(next) ? null : { value: next, commit: onCommit };
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => flush(next), 600);
   }
@@ -60,11 +71,20 @@ export function InlineTextField({
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = null;
     pendingRef.current = null;
+    if (isBlocked(next)) return;
     if (next !== value) onCommit(next);
   }
 
   function handleBlur() {
     isEditingRef.current = false;
+    if (isBlocked(local)) {
+      // Cleared but never refilled — put back what was there rather than erroring.
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      pendingRef.current = null;
+      setLocal(value);
+      setSyncedValue(value);
+      return;
+    }
     flush(local);
     // Pick up anything that changed while the field was focused and the resync was suppressed.
     if (local === value && value !== syncedValue) {

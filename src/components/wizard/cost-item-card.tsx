@@ -78,7 +78,7 @@ export function CostItemCard({
 
       {open && (
         <div className="grid grid-cols-1 gap-3 border-t border-slate-100 p-3 sm:grid-cols-2">
-          <InlineTextField label="Názov položky" value={item.name} className="sm:col-span-2" onCommit={(v) => onUpdate({ name: v })} />
+          <InlineTextField label="Názov položky" value={item.name} className="sm:col-span-2" required onCommit={(v) => onUpdate({ name: v })} />
           <InlineTextAreaField
             label="Podrobný popis"
             value={item.description}

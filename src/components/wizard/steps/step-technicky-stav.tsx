@@ -170,13 +170,14 @@ function CategoryCard({
 
       {open && (
         <div className="flex flex-col gap-3">
-          <InlineTextField label="Názov kategórie" value={category.name} onCommit={onRename} />
+          <InlineTextField label="Názov kategórie" value={category.name} required onCommit={onRename} />
           <div className="flex flex-col gap-2">
             {elements.map((element) => (
               <div key={element.id} className="rounded-lg bg-slate-50 p-2">
                 <div className="mb-1.5 flex items-center gap-2">
                   <InlineTextField
                     value={element.name}
+                    required
                     onCommit={(v) => onRenameElement(element.id, v)}
                     className="flex-1"
                   />

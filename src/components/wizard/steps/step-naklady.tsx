@@ -362,7 +362,7 @@ export function StepNaklady() {
               }
             >
               <div className="-mt-2 flex items-center justify-between gap-2">
-                <InlineTextField value={category.name} onCommit={(v) => renameCategory(category.id, v)} className="flex-1" />
+                <InlineTextField value={category.name} required onCommit={(v) => renameCategory(category.id, v)} className="flex-1" />
                 <span className="whitespace-nowrap text-sm font-semibold text-slate-700">{formatCurrency(subtotal)}</span>
               </div>
               <div className="flex flex-col gap-2">
