@@ -6,9 +6,34 @@ import { z } from "zod";
 // undefined first. Explicit `null` (sent by inline editors to deliberately clear a field) is left
 // untouched so it still reaches Prisma as a real NULL rather than being dropped as "no change".
 const emptyStringToUndefined = (val: unknown) => (val === "" ? undefined : val);
+
+/**
+ * Builds the PATCH counterpart of a create schema: every field optional AND every `.default()`
+ * removed.
+ *
+ * `.partial()` alone is not enough. Zod keeps defaults through it, so parsing `{ unitPrice: 5 }`
+ * against `costItemSchema.partial()` returned quantity 1, VAT 23, priority OPTIONAL and zeroed
+ * labour/material/other as well. Inline editors PATCH only the field that changed, so every edit
+ * quietly rewrote its siblings back to defaults — editing a price reset the quantity, and editing
+ * a finding's note reset its status from V back to OK.
+ *
+ * Unwrapping the defaults means an omitted key stays omitted, so Prisma leaves that column alone.
+ */
 const optionalNumber = () => z.preprocess(emptyStringToUndefined, z.coerce.number().optional());
 const nullableNumber = () => z.preprocess(emptyStringToUndefined, z.coerce.number().nullable().optional());
 const nullableDate = () => z.preprocess(emptyStringToUndefined, z.coerce.date().nullable().optional());
+
+function updateSchemaFrom<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+  const shape = schema.shape as unknown as Record<string, z.ZodTypeAny>;
+  const withoutDefaults: Record<string, z.ZodTypeAny> = {};
+  for (const [key, field] of Object.entries(shape)) {
+    let unwrapped = field;
+    // A field can be wrapped more than once, e.g. `.default().optional()`.
+    while (unwrapped instanceof z.ZodDefault) unwrapped = unwrapped.def.innerType as z.ZodTypeAny;
+    withoutDefaults[key] = unwrapped;
+  }
+  return z.object(withoutDefaults).partial();
+}
 
 // Shared enums (mirrors prisma/schema.prisma string-backed enums)
 export const findingStatusSchema = z.enum(["OK", "V", "R", "N"]);
@@ -132,7 +157,7 @@ export const participantSchema = z.object({
   note: z.string().optional(),
   order: z.number().int().optional(),
 });
-export const participantUpdateSchema = participantSchema.partial();
+export const participantUpdateSchema = updateSchemaFrom(participantSchema);
 
 // ---------------------------------------------------------------------------
 // Rooms
@@ -152,7 +177,7 @@ export const roomSchema = z.object({
   notes: z.string().optional(),
   order: z.number().int().optional(),
 });
-export const roomUpdateSchema = roomSchema.partial();
+export const roomUpdateSchema = updateSchemaFrom(roomSchema);
 
 // ---------------------------------------------------------------------------
 // Technical categories/elements
@@ -163,7 +188,7 @@ export const categorySchema = z.object({
   order: z.number().int().optional(),
   isCustom: z.boolean().optional(),
 });
-export const categoryUpdateSchema = categorySchema.partial();
+export const categoryUpdateSchema = updateSchemaFrom(categorySchema);
 
 export const elementSchema = z.object({
   categoryId: z.string().min(1),
@@ -171,7 +196,7 @@ export const elementSchema = z.object({
   order: z.number().int().optional(),
   isCustom: z.boolean().optional(),
 });
-export const elementUpdateSchema = elementSchema.partial();
+export const elementUpdateSchema = updateSchemaFrom(elementSchema);
 
 // ---------------------------------------------------------------------------
 // Findings & measurements
@@ -194,7 +219,7 @@ export const findingSchema = z.object({
   includeInSummary: z.boolean().optional(),
   order: z.number().int().optional(),
 });
-export const findingUpdateSchema = findingSchema.partial();
+export const findingUpdateSchema = updateSchemaFrom(findingSchema);
 
 export const measurementSchema = z.object({
   // No min-length: a measurement row is created blank and then filled in inline, so the create
@@ -206,7 +231,7 @@ export const measurementSchema = z.object({
   note: z.string().optional(),
   order: z.number().int().optional(),
 });
-export const measurementUpdateSchema = measurementSchema.partial();
+export const measurementUpdateSchema = updateSchemaFrom(measurementSchema);
 
 // ---------------------------------------------------------------------------
 // Room elements — structured checklist (RoomElement / ElementAttribute / ElementCondition)
@@ -248,7 +273,7 @@ export const elementConditionSchema = z.object({
   excludeFromReport: z.boolean().optional(),
   order: z.number().int().optional(),
 });
-export const elementConditionUpdateSchema = elementConditionSchema.partial();
+export const elementConditionUpdateSchema = updateSchemaFrom(elementConditionSchema);
 
 export const customPresetValueSchema = z.object({
   category: z.string().min(1),
@@ -284,7 +309,7 @@ export const costCategorySchema = z.object({
   order: z.number().int().optional(),
   isCustom: z.boolean().optional(),
 });
-export const costCategoryUpdateSchema = costCategorySchema.partial();
+export const costCategoryUpdateSchema = updateSchemaFrom(costCategorySchema);
 
 export const costItemSchema = z.object({
   categoryId: z.string().min(1),
@@ -313,7 +338,7 @@ export const costItemSchema = z.object({
   included: z.boolean().optional(),
   order: z.number().int().optional(),
 });
-export const costItemUpdateSchema = costItemSchema.partial();
+export const costItemUpdateSchema = updateSchemaFrom(costItemSchema);
 
 // ---------------------------------------------------------------------------
 // Recommendations
@@ -328,7 +353,7 @@ export const recommendationSchema = z.object({
   relatedFindingId: z.string().nullable().optional(),
   order: z.number().int().optional(),
 });
-export const recommendationUpdateSchema = recommendationSchema.partial();
+export const recommendationUpdateSchema = updateSchemaFrom(recommendationSchema);
 
 // ---------------------------------------------------------------------------
 // Signatures
@@ -345,7 +370,7 @@ export const signatureSchema = z.object({
   signedAt: z.coerce.date().nullable().optional(),
   imageDataUrl: z.string().nullable().optional(),
 });
-export const signatureUpdateSchema = signatureSchema.partial();
+export const signatureUpdateSchema = updateSchemaFrom(signatureSchema);
 
 // ---------------------------------------------------------------------------
 // Občianska vybavenosť — nearby amenities
@@ -365,7 +390,7 @@ export const amenityPlaceSchema = z.object({
   includeInReport: z.boolean().optional(),
   order: z.number().int().optional(),
 });
-export const amenityPlaceUpdateSchema = amenityPlaceSchema.partial();
+export const amenityPlaceUpdateSchema = updateSchemaFrom(amenityPlaceSchema);
 
 // ---------------------------------------------------------------------------
 // Settings

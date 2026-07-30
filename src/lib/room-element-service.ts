@@ -69,6 +69,30 @@ export async function seedRoomElements(tx: TxClient, roomId: string, roomType: s
   }
 }
 
+/**
+ * Which owner a photo is filed under. Duplication walks several trees — room, element, condition,
+ * finding — and a photo tagged to a condition also carries its room's id, so "every photo on this
+ * room" and "every photo on this room's conditions" overlap. Copying both lists duplicated the
+ * overlap; these two predicates partition the set instead, so every photo is copied exactly once.
+ */
+export type PhotoOwnership = {
+  roomId?: string | null;
+  findingId?: string | null;
+  elementId?: string | null;
+  roomElementId?: string | null;
+  elementConditionId?: string | null;
+};
+
+/** A photo filed against the room itself — not against any element, condition or finding in it. */
+export function isRoomOnlyPhoto(photo: PhotoOwnership) {
+  return !photo.roomElementId && !photo.elementConditionId && !photo.findingId && !photo.elementId;
+}
+
+/** A photo filed against nothing at all — the general shots from the Fotodokumentácia step. */
+export function isLoosePhoto(photo: PhotoOwnership) {
+  return !photo.roomId && isRoomOnlyPhoto(photo);
+}
+
 type SourceRoomTree = Prisma.RoomGetPayload<{
   include: {
     elements: {
@@ -77,6 +101,7 @@ type SourceRoomTree = Prisma.RoomGetPayload<{
         conditions: { include: { measurements: true; photos: true } };
       };
     };
+    photos: true;
   };
 }>;
 
@@ -95,6 +120,40 @@ export async function copyRoomElementsDeep(
   targetInspectionId: string,
   opts: { copyPhotos: boolean }
 ) {
+  if (opts.copyPhotos) {
+    // Photos pinned to the room itself rather than to an element — the "celkový pohľad" shots.
+    // They were falling through both duplication paths: the element walk below never sees them
+    // and the inspection-level copy skips anything that has a roomId.
+    // A condition photo also carries its room's id, so it turns up in this list too; the element
+    // walk below is what copies those, and taking them here as well would duplicate them.
+    for (const photo of sourceRoom.photos.filter(isRoomOnlyPhoto)) {
+      let copied: { storageKey: string; thumbnailKey: string | null };
+      try {
+        copied = await duplicatePhotoFile(photo.storageKey, photo.thumbnailKey);
+      } catch (error) {
+        console.error(`Skipping photo ${photo.id} while duplicating — file unavailable:`, error);
+        continue;
+      }
+      await tx.photo.create({
+        data: {
+          inspectionId: targetInspectionId,
+          roomId: targetRoomId,
+          storageKey: copied.storageKey,
+          thumbnailKey: copied.thumbnailKey,
+          caption: photo.caption,
+          rotationDegrees: photo.rotationDegrees,
+          annotationsJson: photo.annotationsJson,
+          isCover: photo.isCover,
+          excludeFromReport: photo.excludeFromReport,
+          order: photo.order,
+          capturedAt: photo.capturedAt,
+          gpsLat: photo.gpsLat,
+          gpsLng: photo.gpsLng,
+        },
+      });
+    }
+  }
+
   for (const el of sourceRoom.elements) {
     const newEl = await tx.roomElement.create({
       data: {
@@ -142,10 +201,22 @@ export async function copyRoomElementsDeep(
 
       if (opts.copyPhotos) {
         for (const photo of cond.photos) {
-          const { storageKey, thumbnailKey } = await duplicatePhotoFile(photo.storageKey, photo.thumbnailKey);
+          // A blob that has gone missing from storage must not take the whole duplication down
+          // with it — copy what is there and carry on, rather than failing the entire inspection.
+          let copied: { storageKey: string; thumbnailKey: string | null };
+          try {
+            copied = await duplicatePhotoFile(photo.storageKey, photo.thumbnailKey);
+          } catch (error) {
+            console.error(`Skipping photo ${photo.id} while duplicating — file unavailable:`, error);
+            continue;
+          }
+          const { storageKey, thumbnailKey } = copied;
           await tx.photo.create({
             data: {
               inspectionId: targetInspectionId,
+              // Keep the room tag the source photo had, so it still shows under the room in the
+              // Fotodokumentácia step and not only under its condition.
+              roomId: targetRoomId,
               elementConditionId: newCond.id,
               storageKey,
               thumbnailKey,

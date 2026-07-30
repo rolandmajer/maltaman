@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { DEFAULT_COST_CATEGORIES, DEFAULT_TECHNICAL_CATEGORIES } from "@/lib/constants";
 import { nextProtocolNumber } from "@/lib/format";
-import { copyRoomElementsDeep } from "@/lib/room-element-service";
+import { copyRoomElementsDeep, isLoosePhoto } from "@/lib/room-element-service";
+import { duplicatePhotoFile } from "@/lib/storage";
 
 export const INSPECTION_FULL_INCLUDE = {
   property: true,
@@ -144,7 +145,20 @@ export async function duplicateInspectionDeep(sourceId: string, createdById: str
         protocolNumber,
         propertyType: source.propertyType,
         purpose: source.purpose,
+        inspectionDate: source.inspectionDate,
+        startTime: source.startTime,
+        endTime: source.endTime,
         generalNote: source.generalNote,
+        // Steps 5 and 7 are plain columns on the inspection. Leaving them out meant a revision
+        // opened with an empty Zhrnutie and Odporúčania — the technician's whole written
+        // assessment and verdict gone, with nothing to indicate it had ever been there.
+        overallConditionRating: source.overallConditionRating,
+        mainRisks: source.mainRisks,
+        immediateActions: source.immediateActions,
+        followUpInspections: source.followUpInspections,
+        overallVerdict: source.overallVerdict,
+        recommendedDiscountAmount: source.recommendedDiscountAmount,
+        verdictJustification: source.verdictJustification,
         contingencyPercent: source.contingencyPercent,
         costsIncludeVat: source.costsIncludeVat,
         costsEnteredInclVat: source.costsEnteredInclVat,
@@ -163,14 +177,82 @@ export async function duplicateInspectionDeep(sourceId: string, createdById: str
     });
 
     const categoryIdMap = new Map<string, string>();
+    // Findings are keyed off the *old* element ids, so remember which new element each one maps to.
+    const elementIdMap = new Map<string, string>();
     for (const category of source.categories) {
       const newCategory = await tx.inspectionCategory.create({
         data: { inspectionId: inspection.id, name: category.name, order: category.order, isCustom: category.isCustom },
       });
       categoryIdMap.set(category.id, newCategory.id);
       for (const element of category.elements) {
-        await tx.inspectionElement.create({
+        const newElement = await tx.inspectionElement.create({
           data: { categoryId: newCategory.id, name: element.name, order: element.order, isCustom: element.isCustom },
+        });
+        elementIdMap.set(element.id, newElement.id);
+      }
+    }
+
+    // The Technický stav step lives entirely in Finding rows. Copying the elements without them
+    // left a duplicate — and therefore every revision — with an empty technical step: the recorded
+    // statuses, descriptions, severities and measurements were all silently dropped.
+    const findingIdMap = new Map<string, string>();
+    for (const finding of source.findings) {
+      const newFinding = await tx.finding.create({
+        data: {
+          inspectionId: inspection.id,
+          elementId: finding.elementId ? (elementIdMap.get(finding.elementId) ?? null) : null,
+          checklistKey: finding.checklistKey,
+          label: finding.label,
+          status: finding.status,
+          defectTypes: finding.defectTypes,
+          description: finding.description,
+          severity: finding.severity,
+          location: finding.location,
+          recommendedAction: finding.recommendedAction,
+          recommendedSpecialist: finding.recommendedSpecialist,
+          urgency: finding.urgency,
+          isPositiveObservation: finding.isPositiveObservation,
+          includeInSummary: finding.includeInSummary,
+          order: finding.order,
+          measurements: {
+            create: finding.measurements.map((m) => ({
+              label: m.label,
+              value: m.value,
+              unit: m.unit,
+              note: m.note,
+              order: m.order,
+            })),
+          },
+        },
+      });
+
+      findingIdMap.set(finding.id, newFinding.id);
+
+      for (const photo of finding.photos) {
+        // Same rule as the room elements: a blob missing from storage is skipped, not fatal.
+        let copied: { storageKey: string; thumbnailKey: string | null };
+        try {
+          copied = await duplicatePhotoFile(photo.storageKey, photo.thumbnailKey);
+        } catch (error) {
+          console.error(`Skipping photo ${photo.id} while duplicating — file unavailable:`, error);
+          continue;
+        }
+        await tx.photo.create({
+          data: {
+            inspectionId: inspection.id,
+            findingId: newFinding.id,
+            storageKey: copied.storageKey,
+            thumbnailKey: copied.thumbnailKey,
+            caption: photo.caption,
+            rotationDegrees: photo.rotationDegrees,
+            annotationsJson: photo.annotationsJson,
+            isCover: photo.isCover,
+            excludeFromReport: photo.excludeFromReport,
+            order: photo.order,
+            capturedAt: photo.capturedAt,
+            gpsLat: photo.gpsLat,
+            gpsLng: photo.gpsLng,
+          },
         });
       }
     }
@@ -252,6 +334,50 @@ export async function duplicateInspectionDeep(sourceId: string, createdById: str
       });
     }
 
+    // Photos attached to a room, element, condition or finding were copied alongside their owner.
+    // What is left are the loose ones from the Fotodokumentácia step, which belong to no row and
+    // would otherwise be the only part of that step missing from the copy.
+    for (const photo of source.photos.filter(isLoosePhoto)) {
+      let copied: { storageKey: string; thumbnailKey: string | null };
+      try {
+        copied = await duplicatePhotoFile(photo.storageKey, photo.thumbnailKey);
+      } catch (error) {
+        console.error(`Skipping photo ${photo.id} while duplicating — file unavailable:`, error);
+        continue;
+      }
+      await tx.photo.create({
+        data: {
+          inspectionId: inspection.id,
+          storageKey: copied.storageKey,
+          thumbnailKey: copied.thumbnailKey,
+          caption: photo.caption,
+          rotationDegrees: photo.rotationDegrees,
+          annotationsJson: photo.annotationsJson,
+          isCover: photo.isCover,
+          excludeFromReport: photo.excludeFromReport,
+          order: photo.order,
+          capturedAt: photo.capturedAt,
+          gpsLat: photo.gpsLat,
+          gpsLng: photo.gpsLng,
+        },
+      });
+    }
+
+    // Recommendations point at a room and/or a finding; both were just re-created, so the links
+    // are remapped onto the copies rather than left dangling at the source inspection's rows.
+    for (const rec of source.recommendations) {
+      await tx.recommendation.create({
+        data: {
+          inspectionId: inspection.id,
+          category: rec.category,
+          text: rec.text,
+          relatedRoomId: rec.relatedRoomId ? (roomIdMap.get(rec.relatedRoomId) ?? null) : null,
+          relatedFindingId: rec.relatedFindingId ? (findingIdMap.get(rec.relatedFindingId) ?? null) : null,
+          order: rec.order,
+        },
+      });
+    }
+
     // The property (and therefore the location) is copied verbatim, so the amenities still apply —
     // carrying them over saves re-running the lookup against OpenStreetMap for the same address.
     for (const place of source.amenityPlaces) {
@@ -277,9 +403,16 @@ export async function duplicateInspectionDeep(sourceId: string, createdById: str
   });
 }
 
-function stripId<T extends { id: string }>(obj: T): Omit<T, "id"> {
-  const { id: _id, ...rest } = obj;
+/**
+ * Strips the primary key *and* the parent foreign key before re-creating a row as a nested
+ * `create`. Prisma rejects `inspectionId` inside a nested create — it sets that relation itself —
+ * so leaving it in made every duplicate and revision fail with a 500. TypeScript doesn't catch it
+ * because an object spread skips excess-property checking.
+ */
+export function stripId<T extends { id: string; inspectionId?: string }>(obj: T): Omit<T, "id" | "inspectionId"> {
+  const { id: _id, inspectionId: _inspectionId, ...rest } = obj;
   void _id;
+  void _inspectionId;
   return rest;
 }
 

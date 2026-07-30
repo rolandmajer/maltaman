@@ -210,6 +210,44 @@ describe("computeCostTotals", () => {
   });
 });
 
+describe("rounding on the half-cent boundary", () => {
+  /**
+   * `167.9 * 1.15` is 193.08499999999998 in binary floating point, so the max scenario in the PDF
+   * came out a cent short of the 193.09 a reader gets from the printed figures. The old guard —
+   * adding Number.EPSILON before rounding — was ~200× smaller than the gap between doubles at that
+   * magnitude and therefore did nothing at all.
+   */
+  const item = {
+    quantity: 3,
+    unitPrice: 45.5,
+    laborCost: 0,
+    materialCost: 0,
+    otherCost: 0,
+    vatRatePercent: 23,
+  };
+
+  it("rounds the max scenario up, matching the printed gross price", () => {
+    const result = computeCostItem(item);
+    expect(result.priceInclVat).toBe(167.9);
+    expect(result.maxEstimate).toBe(193.09);
+  });
+
+  it("rounds the min scenario from the same gross price", () => {
+    expect(computeCostItem(item).minEstimate).toBe(142.72);
+  });
+
+  it("keeps net + VAT equal to the gross shown", () => {
+    const result = computeCostItem(item);
+    expect(result.priceExclVat + result.vatAmount).toBeCloseTo(result.priceInclVat, 10);
+  });
+
+  it("rounds a gross-entered price back to the same net", () => {
+    const result = computeCostItem({ ...item, quantity: 1, unitPrice: 167.9 }, true);
+    expect(result.priceInclVat).toBe(167.9);
+    expect(result.priceExclVat).toBe(136.5);
+  });
+});
+
 describe("computeRoomArea", () => {
   it("prefers the manual override when present", () => {
     expect(computeRoomArea(3, 4, 15)).toBe(15);

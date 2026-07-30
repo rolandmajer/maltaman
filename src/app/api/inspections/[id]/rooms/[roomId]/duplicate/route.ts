@@ -17,6 +17,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           orderBy: { order: "asc" },
           include: { attributes: true, conditions: { orderBy: { order: "asc" }, include: { measurements: true, photos: true } } },
         },
+        photos: { orderBy: { order: "asc" } },
       },
     });
     if (!source || source.inspectionId !== id) throw new ApiError(404, "Miestnosť nebola nájdená");

@@ -163,10 +163,18 @@ export async function duplicatePhotoFile(
   const newStorageKey = `${id}.jpg`;
   await backend.put(newStorageKey, await backend.get(storageKey));
 
+  // A thumbnail is a derived convenience, not the photo. If it has gone missing the copy still
+  // gets the real image and the app regenerates or falls back to the full-size file — failing here
+  // would have thrown away an intact photograph over a lost cache entry.
   let newThumbnailKey: string | null = null;
   if (thumbnailKey) {
-    newThumbnailKey = `${id}.thumb.jpg`;
-    await backend.put(newThumbnailKey, await backend.get(thumbnailKey));
+    try {
+      newThumbnailKey = `${id}.thumb.jpg`;
+      await backend.put(newThumbnailKey, await backend.get(thumbnailKey));
+    } catch (error) {
+      console.error(`Thumbnail ${thumbnailKey} unavailable while duplicating — copying without it:`, error);
+      newThumbnailKey = null;
+    }
   }
   return { storageKey: newStorageKey, thumbnailKey: newThumbnailKey };
 }

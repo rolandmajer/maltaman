@@ -22,7 +22,21 @@ export type CostItemComputed = {
   maxEstimate: number;
 };
 
-const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+/**
+ * Rounds money to cents, half away from zero.
+ *
+ * The previous `Math.round((n + Number.EPSILON) * 100) / 100` did not work: Number.EPSILON is
+ * 2.2e-16, but the gap between representable doubles near 193 is ~4.3e-14 — roughly 200× larger —
+ * so adding it changed nothing. `167.9 * 1.15` is 193.08499999999998 in binary floating point and
+ * rounded down to 193.08 instead of 193.09, leaving the report a cent short.
+ *
+ * Scaling and trimming to 6 decimals first discards the binary representation error, so the value
+ * on the .005 boundary rounds the way a person reading the figures expects.
+ */
+const round2 = (n: number) => {
+  const scaled = Number((n * 100).toFixed(6));
+  return (scaled < 0 ? -Math.round(-scaled) : Math.round(scaled)) / 100;
+};
 
 /** Row-level totals for a single cost item. Negative inputs are clamped to 0. */
 /**
