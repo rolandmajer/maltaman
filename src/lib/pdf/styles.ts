@@ -13,6 +13,10 @@ export const colors = {
   /** Divider on the red cover. The design uses rgba white; react-pdf does not parse rgba() and
    *  rendered it as a stray green, so this is the same value flattened against the brand red. */
   brandHairline: "#d1615e",
+  /** The two decorative rings bleeding off the cover's top-right corner — the design's
+   *  rgba(255,255,255,.16) and .14 over the brand red, flattened for the same reason. */
+  coverRingOuter: "#ce5855",
+  coverRingInner: "#cd5451",
 
   ink: "#201d1b",
   body: "#3a3330",

@@ -226,8 +226,39 @@ function CoverPage({ inspection, settings, logoWhiteBuffer }: Props) {
           paddingVertical: 44,
           paddingHorizontal: 38,
           color: colors.white,
+          // Clips the two rings below to the rounded panel — without it they hang off the corner
+          // and over the white page margin.
+          overflow: "hidden",
         }}
       >
+        {/* Decorative rings bleeding off the top-right corner. Drawn first so everything else
+            paints over them, and sized in points (borderRadius takes no percentage here, so each
+            radius is simply half the box). */}
+        <View
+          style={{
+            position: "absolute",
+            top: -100.8,
+            right: -100.8,
+            width: 302.4,
+            height: 302.4,
+            borderRadius: 151.2,
+            borderWidth: 1.5,
+            borderColor: colors.coverRingOuter,
+          }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            top: -43.2,
+            right: -43.2,
+            width: 187.2,
+            height: 187.2,
+            borderRadius: 93.6,
+            borderWidth: 1.5,
+            borderColor: colors.coverRingInner,
+          }}
+        />
+
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           {logoWhiteBuffer ? (
             <Image src={logoWhiteBuffer} style={{ height: 21, objectFit: "contain" }} />
