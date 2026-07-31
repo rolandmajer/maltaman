@@ -42,4 +42,8 @@ primary_region = 'fra'
 
 [[vm]]
   size = 'shared-cpu-1x'
-  memory = '512mb'
+  # 1GB, not the default 512mb. Measured on the 512mb machine: 459MB usable, next-server holding
+  # ~278MB of it, and a single PDF render taking available memory from 171MB down to 118MB. That
+  # left room for one render and nothing else — an export on a busy machine had no margin at all.
+  # Still scales to zero when idle, so the extra memory costs nothing between site visits.
+  memory = '1gb'
