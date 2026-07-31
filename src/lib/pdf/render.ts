@@ -9,7 +9,29 @@ import { computeCostItem, computeCostTotals, type CostItemForTotals } from "@/li
 import { InspectionDocument } from "@/lib/pdf/inspection-document";
 import { ensureFontsRegistered } from "@/lib/pdf/fonts";
 
-export async function renderInspectionPdf(inspectionId: string): Promise<Buffer> {
+/**
+ * Renders in flight, keyed by inspection. A report takes several seconds and roughly 50 MB on the
+ * 512 MB machine, and nothing in the UI stopped a technician from tapping "Stiahnuť PDF" again
+ * while the first tap was still working — on a suspended machine the first tap can take ~30s to
+ * answer, which invites exactly that. Each tap used to start its own independent render, so four
+ * impatient taps meant four concurrent renders and four times the memory on a box that only has
+ * headroom for one.
+ */
+const rendersInFlight = new Map<string, Promise<Buffer>>();
+
+/** Serialises renders of the same inspection: concurrent callers share one render's result. */
+export function renderInspectionPdf(inspectionId: string): Promise<Buffer> {
+  const existing = rendersInFlight.get(inspectionId);
+  if (existing) return existing;
+
+  const started = renderInspectionPdfUncached(inspectionId).finally(() => {
+    rendersInFlight.delete(inspectionId);
+  });
+  rendersInFlight.set(inspectionId, started);
+  return started;
+}
+
+async function renderInspectionPdfUncached(inspectionId: string): Promise<Buffer> {
   ensureFontsRegistered();
 
   const inspection = await getFullInspection(inspectionId);
