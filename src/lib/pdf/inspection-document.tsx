@@ -386,7 +386,7 @@ function SummaryPage(props: Props & { numbering: Numbering }) {
   const assessed = assessedCount(tally);
   const defects = collectDefects(inspection);
   const area = totalFloorArea(inspection);
-  const negotiation = negotiationAmount(inspection);
+  const negotiation = negotiationAmount(inspection, totals);
 
   const okPct = assessed ? (tally.ok / assessed) * 100 : 0;
   const badPct = assessed ? ((tally.v + tally.r) / assessed) * 100 : 0;
@@ -522,12 +522,19 @@ function SummaryPage(props: Props & { numbering: Numbering }) {
         <View style={{ width: "34%" }}>
           <Text style={[styles.eyebrow, { color: colors.brandDark, marginBottom: 5 }]}>PODKLAD NA VYJEDNÁVANIE</Text>
           <Text style={{ fontFamily: "Archivo", fontWeight: 900, fontSize: 18, color: colors.brand }}>
-            {formatCurrency(negotiation.amount)}
+            {negotiation.amount > 0 ? formatCurrency(negotiation.amount) : "—"}
           </Text>
         </View>
         <View style={{ width: "66%", borderLeftWidth: 1, borderLeftColor: colors.brandWashBorder, paddingLeft: 14 }}>
           <Text style={{ fontSize: 8.6, lineHeight: 1.45, color: colors.body }}>
-            {negotiation.derived ? (
+            {negotiation.amount === 0 ? (
+              // Saying "0 €" here would read as "nothing to negotiate", which is a different
+              // claim from "no estimate was priced".
+              <>
+                K protokolu zatiaľ nebol zadaný odhad nákladov, preto nie je uvedená ani orientačná suma na
+                vyjednávanie.
+              </>
+            ) : negotiation.derived ? (
               <>
                 Orientačný náklad na odstránenie <Text style={{ fontWeight: 700 }}>{defects.length} zistených vád</Text>
                 {inspection.contingencyPercent > 0

@@ -1,4 +1,4 @@
-import { computeCostItem, computeRoomArea } from "@/lib/calculations";
+import { computeRoomArea } from "@/lib/calculations";
 import { parseJsonStringArray } from "@/lib/element-description";
 import type { FullInspection } from "@/types/inspection";
 
@@ -100,23 +100,23 @@ export function totalFloorArea(inspection: FullInspection): number | null {
 }
 
 /**
- * The figure the client takes into a price negotiation. The technician's own number wins when they
- * set one; otherwise it is the cost of the items actually tied to a defect (not the full renovation
- * budget, which includes work the seller is not answerable for), plus the same contingency rate.
+ * The figure the client takes into a price negotiation: the technician's own recommended discount
+ * when they set one, otherwise the full estimate including VAT and the reserve.
+ *
+ * That total is the same number the app's own "Podklady pre vyjednávanie" text is built on, so the
+ * headline and the narrative agree. An earlier version counted only cost items linked to a defect,
+ * on the theory that the rest is work the seller is not answerable for — but linking an item to a
+ * defect is optional and most are entered straight into a category, so that version printed a
+ * confident 0 € on a report carrying eighteen priced items.
  */
-export function negotiationAmount(inspection: FullInspection): { amount: number; derived: boolean } {
+export function negotiationAmount(
+  inspection: FullInspection,
+  totals: { finalTotalWithContingency: number }
+): { amount: number; derived: boolean } {
   if (inspection.recommendedDiscountAmount != null && inspection.recommendedDiscountAmount > 0) {
     return { amount: inspection.recommendedDiscountAmount, derived: false };
   }
-  const linked = inspection.costItems.filter(
-    (item) => item.included && (item.elementConditionId || item.findingId || item.roomElementId)
-  );
-  const gross = linked.reduce(
-    (acc, item) => acc + computeCostItem(item, inspection.costsEnteredInclVat).priceInclVat,
-    0
-  );
-  const withReserve = gross * (1 + Math.max(0, inspection.contingencyPercent) / 100);
-  return { amount: Math.round(withReserve * 100) / 100, derived: true };
+  return { amount: totals.finalTotalWithContingency, derived: true };
 }
 
 /** Splits a list into two balanced columns, since react-pdf has no `column-count`. */
