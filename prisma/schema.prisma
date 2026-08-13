@@ -23,6 +23,8 @@ model Organisation {
 
   users              User[]
   inspections        Inspection[]
+  customers          Customer[]
+  leads              Lead[]
   settings           AppSettings?
   customPresetValues CustomPresetValue[]
 }
@@ -108,12 +110,81 @@ enum OverallConditionRating {
   ZLY
 }
 
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  BOOKED
+  WON
+  LOST
+}
+
+enum LeadSource {
+  CHECKLIST
+  WEBSITE
+  REFERRAL
+  MANUAL
+  OTHER
+}
+
+model Customer {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  name            String   @default("")
+  email           String   @default("")
+  emailNormalized String   @default("")
+  phone           String   @default("")
+  notes           String   @default("")
+  consentAt       DateTime?
+  consentSource   String   @default("")
+
+  leads       Lead[]
+  inspections Inspection[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organisationId, emailNormalized])
+  @@index([organisationId, name])
+}
+
+model Lead {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  status LeadStatus @default(NEW)
+  source LeadSource @default(MANUAL)
+
+  propertyAddress String @default("")
+  propertyType    String @default("")
+  message         String @default("")
+  nextActionAt    DateTime?
+  externalId      String?
+
+  inspectionId String?     @unique
+  inspection   Inspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organisationId, externalId])
+  @@index([organisationId, status])
+  @@index([customerId])
+}
+
 model Inspection {
   id             String       @id @default(cuid())
   organisationId String
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   createdById    String
   createdBy      User         @relation("InspectionCreatedBy", fields: [createdById], references: [id])
+  customerId     String?
+  customer       Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   protocolNumber String
   status         InspectionStatus @default(DRAFT)
@@ -179,9 +250,11 @@ model Inspection {
   signatures      Signature[]
   reportRevisions ReportRevision[]
   amenityPlaces   AmenityPlace[]
+  lead            Lead?
 
   @@unique([organisationId, protocolNumber])
   @@index([organisationId, status])
+  @@index([customerId])
 }
 
 /// One nearby place in the "Občianska vybavenosť" section — a school, shop, stop, park…

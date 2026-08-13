@@ -78,6 +78,43 @@ export const conditionDeadlineSchema = z.enum([
   "SLEDOVAT",
   "NIE_JE_POTREBNY",
 ]);
+export const leadStatusSchema = z.enum(["NEW", "CONTACTED", "QUALIFIED", "BOOKED", "WON", "LOST"]);
+export const leadSourceSchema = z.enum(["CHECKLIST", "WEBSITE", "REFERRAL", "MANUAL", "OTHER"]);
+
+// ---------------------------------------------------------------------------
+// CRM
+// ---------------------------------------------------------------------------
+
+export const customerSchema = z.object({
+  name: z.string().trim().optional(),
+  email: z.string().trim().email("Neplatný e-mail"),
+  phone: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+  consent: z.boolean().optional(),
+  consentSource: z.string().trim().optional(),
+});
+
+export const customerUpdateSchema = customerSchema.partial();
+
+export const leadSchema = z.object({
+  customerId: z.string().min(1).optional(),
+  name: z.string().trim().optional(),
+  email: z.string().trim().email("Neplatný e-mail").optional(),
+  phone: z.string().trim().optional(),
+  source: leadSourceSchema.optional(),
+  propertyAddress: z.string().trim().optional(),
+  propertyType: z.string().trim().optional(),
+  message: z.string().trim().optional(),
+  nextActionAt: nullableDate(),
+});
+
+export const leadUpdateSchema = z.object({
+  status: leadStatusSchema.optional(),
+  propertyAddress: z.string().trim().optional(),
+  propertyType: z.string().trim().optional(),
+  message: z.string().trim().optional(),
+  nextActionAt: nullableDate(),
+});
 
 // ---------------------------------------------------------------------------
 // Inspection root

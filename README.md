@@ -181,6 +181,24 @@ production.)
 
 Subsequent deploys are just `fly deploy` again; migrations and data on the volume persist.
 
+## CRM and website checklist integration
+
+The authenticated CRM is available at `/crm/leads` and `/crm/customers`. A lead can be converted
+into a pre-filled inspection; the inspection keeps its own owner/property fields as a historical
+snapshot while also linking back to the reusable customer record.
+
+`POST /api/integrations/netlify/checklist` accepts Netlify form-notification webhooks. The endpoint
+is public at the routing layer so Netlify can reach it, but every request must carry a valid
+`X-Webhook-Signature` JWS. Configure:
+
+1. A random `NETLIFY_WEBHOOK_SECRET` Fly secret.
+2. The same value as the JWS secret on a Netlify form notification pointing to
+   `https://maltaman.fly.dev/api/integrations/netlify/checklist`.
+3. `NETLIFY_CRM_ORGANISATION_ID` when the database contains more than one organisation.
+
+Duplicate Netlify submissions are idempotent by their external submission ID. The checklist
+e-mail creates or updates a customer, then creates a `CHECKLIST` lead with recorded consent.
+
 ## Testing
 
 - **Unit** (`src/**/*.test.ts(x)`, Vitest): cost/VAT/contingency math, step-completion logic,

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Settings, LogOut, Home } from "lucide-react";
+import { Settings, LogOut, Home, Users, ContactRound, ClipboardCheck } from "lucide-react";
 import { signOutAction } from "@/app/actions";
 import { SyncStatusBadge } from "@/components/sync-status-badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,17 @@ export function AppHeader({ userName, backHref }: { userName: string; backHref?:
               <Image src="/logo.png" alt="MALTAMAN" width={110} height={15} className="h-4 w-auto" priority />
             </Link>
           )}
+          <nav className="ml-2 hidden items-center gap-1 sm:flex" aria-label="Hlavná navigácia">
+            <Link href="/">
+              <Button variant="ghost" size="sm"><ClipboardCheck /> Obhliadky</Button>
+            </Link>
+            <Link href="/crm/leads">
+              <Button variant="ghost" size="sm"><ContactRound /> Leady</Button>
+            </Link>
+            <Link href="/crm/customers">
+              <Button variant="ghost" size="sm"><Users /> Klienti</Button>
+            </Link>
+          </nav>
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <SyncStatusBadge className="hidden sm:inline-flex" />
@@ -37,6 +48,17 @@ export function AppHeader({ userName, backHref }: { userName: string; backHref?:
           </form>
         </div>
       </div>
+      <nav className="grid grid-cols-3 border-t border-slate-100 sm:hidden" aria-label="Hlavná navigácia">
+        <Link href="/" className="flex items-center justify-center gap-1.5 py-2 text-xs text-slate-600">
+          <ClipboardCheck className="size-4" /> Obhliadky
+        </Link>
+        <Link href="/crm/leads" className="flex items-center justify-center gap-1.5 py-2 text-xs text-slate-600">
+          <ContactRound className="size-4" /> Leady
+        </Link>
+        <Link href="/crm/customers" className="flex items-center justify-center gap-1.5 py-2 text-xs text-slate-600">
+          <Users className="size-4" /> Klienti
+        </Link>
+      </nav>
       <div className="border-t border-slate-100 px-4 py-1.5 sm:hidden">
         <SyncStatusBadge />
       </div>
