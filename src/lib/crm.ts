@@ -2,9 +2,33 @@ import { db } from "@/lib/db";
 import { ApiError } from "@/lib/api-helpers";
 import { createInspection } from "@/lib/inspection-service";
 import type { LeadSource } from "@/generated/prisma/enums";
+import { inspectionClientCandidate } from "@/lib/inspection-client";
 
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+export async function syncInspectionCustomer(inspectionId: string, organisationId: string) {
+  const inspection = await db.inspection.findFirst({
+    where: { id: inspectionId, organisationId },
+    select: {
+      property: { select: { ownerName: true, ownerContact: true } },
+      participants: { select: { fullName: true, role: true, email: true, phone: true }, orderBy: { order: "asc" } },
+    },
+  });
+  if (!inspection) throw new ApiError(404, "Obhliadka nebola nájdená");
+
+  const candidate = inspectionClientCandidate(inspection);
+  if (!candidate) return null;
+
+  const customer = await upsertCustomer({
+    organisationId,
+    email: candidate.email,
+    name: candidate.name,
+    phone: candidate.phone,
+  });
+  await db.inspection.update({ where: { id: inspectionId }, data: { customerId: customer.id } });
+  return customer;
 }
 
 export async function upsertCustomer(params: {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireInspectionAccess, requireSession, jsonError } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
 import { propertyUpdateSchema } from "@/lib/validation";
+import { syncInspectionCustomer } from "@/lib/crm";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -14,6 +15,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       create: { inspectionId: id, ...data },
       update: data,
     });
+    await syncInspectionCustomer(id, user.organisationId);
     return NextResponse.json(property);
   } catch (error) {
     return jsonError(error);

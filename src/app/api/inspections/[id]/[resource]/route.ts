@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireInspectionAccess, requireSession, jsonError } from "@/lib/api-helpers";
 import { RESOURCE_MAP } from "@/lib/api-resources";
+import { syncInspectionCustomer } from "@/lib/crm";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string; resource: string }> }) {
   try {
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const created = await config.delegate.create({
       data: { ...data, inspectionId: id },
     });
+    if (resource === "participants") await syncInspectionCustomer(id, user.organisationId);
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     return jsonError(error);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireInspectionAccess, requireSession, jsonError, ApiError } from "@/lib/api-helpers";
 import { RESOURCE_MAP } from "@/lib/api-resources";
+import { syncInspectionCustomer } from "@/lib/crm";
 
 async function loadScopedItem(
   config: (typeof RESOURCE_MAP)[string],
@@ -31,6 +32,7 @@ export async function PATCH(
     const body = await req.json();
     const data = config.updateSchema.parse(body);
     const updated = await config.delegate.update({ where: { id: itemId }, data });
+    if (resource === "participants") await syncInspectionCustomer(id, user.organisationId);
     return NextResponse.json(updated);
   } catch (error) {
     return jsonError(error);
