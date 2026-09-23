@@ -45,6 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/bootstrap-admin") ||
         pathname.startsWith("/api/integrations/netlify/") ||
+        pathname === "/api/public/intake" ||
         pathname.startsWith("/api/public/quotation-form/") ||
         pathname.startsWith("/ponuka/") ||
         pathname.startsWith("/manifest") ||
