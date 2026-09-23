@@ -3,7 +3,6 @@ import { Plus, FileText } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AppHeader } from "@/components/app-header";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { quotationTotals } from "@/lib/quotation-calculations";
@@ -28,7 +27,7 @@ export default async function QuotationsPage() {
             <h1 className="text-2xl font-bold text-slate-900">Cenové ponuky</h1>
             <p className="text-sm text-slate-500">Cena obhliadky, cestovné a služby, ktoré si klient vyberie samostatne.</p>
           </div>
-          <Link href="/cenove-ponuky/nova"><Button><Plus /> Nová cenová ponuka</Button></Link>
+          <Link href="/cenove-ponuky/nova" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-800 active:bg-brand-900"><Plus className="size-4" /> Nová cenová ponuka</Link>
         </div>
         <div className="grid gap-3">
           {quotations.length === 0 && <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500">Zatiaľ nemáte žiadnu cenovú ponuku.</div>}

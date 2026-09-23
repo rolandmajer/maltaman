@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/alt-text -- @react-pdf/renderer Image does not expose the browser alt prop. */
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { colors } from "@/lib/pdf/styles";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";

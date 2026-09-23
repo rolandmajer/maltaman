@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calculator, Check, FileDown, Loader2, MapPin, Save, Send, Wrench } from "lucide-react";
+import { Check, FileDown, Loader2, MapPin, Save, Send, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPatch, apiPost } from "@/lib/offline/api-client";
 import { Button } from "@/components/ui/button";
