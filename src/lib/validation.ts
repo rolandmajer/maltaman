@@ -131,6 +131,7 @@ export const quotationCreateSchema = z.object({
   propertyAddress: z.string().trim().optional(),
   propertyType: quotationPropertyTypeSchema.default("APARTMENT"),
   floorAreaM2: z.coerce.number().nonnegative().default(0),
+  baseRatePerM2: z.coerce.number().nonnegative().optional(),
   floors: z.coerce.number().int().min(1).default(1),
   complexityFactors: z.array(z.string()).default([]),
   oneWayDistanceKm: z.coerce.number().nonnegative().default(0),

@@ -53,14 +53,14 @@ type QuoteResponse = {
 
 type FormState = {
   customerId: string; clientName: string; clientEmail: string; clientPhone: string;
-  propertyAddress: string; propertyType: PropertyPricingType; floorAreaM2: number; floors: number;
+  propertyAddress: string; propertyType: PropertyPricingType; floorAreaM2: number; baseRatePerM2: number; floors: number;
   complexityFactors: string[]; oneWayDistanceKm: number; distanceManual: boolean; routeNote: string;
   selectedOptionalCodes: string[]; discountAmount: number; pricesIncludeVat: boolean; notes: string;
 };
 
 const EMPTY_FORM: FormState = {
   customerId: "", clientName: "", clientEmail: "", clientPhone: "", propertyAddress: "",
-  propertyType: "APARTMENT", floorAreaM2: 0, floors: 1, complexityFactors: [], oneWayDistanceKm: 0,
+  propertyType: "APARTMENT", floorAreaM2: 0, baseRatePerM2: 0, floors: 1, complexityFactors: [], oneWayDistanceKm: 0,
   distanceManual: false, routeNote: "", selectedOptionalCodes: [], discountAmount: 0, pricesIncludeVat: true, notes: "",
 };
 
@@ -97,11 +97,13 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
         setForm({
           customerId: loadedQuote.customerId ?? "", clientName: loadedQuote.clientName, clientEmail: loadedQuote.clientEmail,
           clientPhone: loadedQuote.clientPhone, propertyAddress: loadedQuote.propertyAddress, propertyType: loadedQuote.propertyType,
-          floorAreaM2: loadedQuote.floorAreaM2, floors: loadedQuote.floors, complexityFactors: factors,
+          floorAreaM2: loadedQuote.floorAreaM2, baseRatePerM2: loadedQuote.baseRatePerM2, floors: loadedQuote.floors, complexityFactors: factors,
           oneWayDistanceKm: loadedQuote.oneWayDistanceKm, distanceManual: loadedQuote.distanceManual, routeNote: loadedQuote.routeNote,
           selectedOptionalCodes: loadedQuote.lineItems.filter((line) => line.kind === "OPTIONAL" && line.selected).map((line) => line.code),
           discountAmount: loadedQuote.discountAmount, pricesIncludeVat: loadedQuote.pricesIncludeVat, notes: loadedQuote.notes,
         });
+      } else {
+        setForm((previous) => ({ ...previous, baseRatePerM2: loadedSettings.apartmentRatePerM2 }));
       }
     }).catch(() => toast.error("Cenovú ponuku sa nepodarilo načítať")).finally(() => setLoading(false));
   }, [quotationId]);
@@ -117,7 +119,8 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
 
   const preview = useMemo(() => {
     if (!settings) return null;
-    const pricing = quote ? { rate: quote.baseRatePerM2, minimum: quote.minimumPrice, label: rateFor(form.propertyType, settings).label } : rateFor(form.propertyType, settings);
+    const configuredPricing = rateFor(form.propertyType, settings);
+    const pricing = { rate: form.baseRatePerM2, minimum: quote?.minimumPrice ?? configuredPricing.minimum, label: configuredPricing.label };
     const base = baseInspectionPrice(form.floorAreaM2, pricing.rate, pricing.minimum);
     const complexityPercent = complexityPercentFor(form.complexityFactors);
     const returnKm = Math.round(form.oneWayDistanceKm * 20) / 10;
@@ -133,6 +136,18 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
   }, [form, locked, quote, services, settings]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) { setForm((previous) => ({ ...previous, [key]: value })); }
+
+  function validateRequiredFields() {
+    const missing = [
+      !form.clientName.trim() ? "meno klienta" : null,
+      !form.propertyAddress.trim() ? "adresu nehnuteľnosti" : null,
+      form.floorAreaM2 <= 0 ? "podlahovú plochu" : null,
+      form.baseRatePerM2 <= 0 ? "cenu za m²" : null,
+    ].filter((item): item is string => Boolean(item));
+    if (missing.length === 0) return true;
+    toast.error(`Doplňte: ${missing.join(", ")}.`);
+    return false;
+  }
 
   function toggleFactor(code: string) {
     setForm((previous) => {
@@ -159,9 +174,7 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
   }
 
   async function save() {
-    if (!form.clientName.trim() || !form.propertyAddress.trim() || form.floorAreaM2 <= 0) {
-      toast.error("Zadajte klienta, adresu a podlahovú plochu."); return null;
-    }
+    if (!validateRequiredFields()) return null;
     setSaving(true);
     try {
       const body = { ...form, customerId: form.customerId || null };
@@ -177,9 +190,7 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
 
   async function setStatus(status: "SENT" | "ACCEPTED") {
     if (!quote) return;
-    if (!form.clientName.trim() || !form.propertyAddress.trim() || form.floorAreaM2 <= 0) {
-      toast.error("Zadajte klienta, adresu a podlahovú plochu."); return;
-    }
+    if (!validateRequiredFields()) return;
     setSaving(true);
     try {
       // Persist the visible calculator first, then change only the status. The second request
@@ -228,9 +239,10 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
             <Field label="Meno klienta"><Input value={form.clientName} onChange={(e) => update("clientName", e.target.value)} /></Field>
             <Field label="E-mail"><Input type="email" value={form.clientEmail} onChange={(e) => update("clientEmail", e.target.value)} /></Field>
             <Field label="Telefón"><Input value={form.clientPhone} onChange={(e) => update("clientPhone", e.target.value)} /></Field>
-            <Field label="Typ nehnuteľnosti"><Select value={form.propertyType} onValueChange={(value) => update("propertyType", value as PropertyPricingType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="APARTMENT">Byt</SelectItem><SelectItem value="HOUSE">Rodinný dom</SelectItem><SelectItem value="SHELL">Novostavba / holostavba</SelectItem><SelectItem value="OTHER">Komerčná / iná</SelectItem></SelectContent></Select></Field>
+            <Field label="Typ nehnuteľnosti"><Select value={form.propertyType} onValueChange={(value) => { const propertyType = value as PropertyPricingType; setForm((previous) => ({ ...previous, propertyType, baseRatePerM2: rateFor(propertyType, settings).rate })); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="APARTMENT">Byt</SelectItem><SelectItem value="HOUSE">Rodinný dom</SelectItem><SelectItem value="SHELL">Novostavba / holostavba</SelectItem><SelectItem value="OTHER">Komerčná / iná</SelectItem></SelectContent></Select></Field>
             <Field label="Adresa nehnuteľnosti" className="sm:col-span-2"><Input value={form.propertyAddress} onChange={(e) => update("propertyAddress", e.target.value)} placeholder="Ulica, číslo, obec, PSČ" /></Field>
             <Field label="Podlahová plocha (m²)"><Input type="number" min="0" step="0.1" value={form.floorAreaM2 || ""} onChange={(e) => update("floorAreaM2", parseDecimalOr(e.target.value))} /></Field>
+            <Field label="Cena za m² (€)"><Input type="number" min="0" step="0.01" value={form.baseRatePerM2 || ""} onChange={(e) => update("baseRatePerM2", parseDecimalOr(e.target.value))} /></Field>
             <Field label="Počet podlaží"><Input type="number" min="1" value={form.floors} onChange={(e) => { const floors = Math.max(1, Math.round(parseDecimalOr(e.target.value, 1))); setForm((previous) => ({ ...previous, floors, complexityFactors: floors > 2 ? [...new Set([...previous.complexityFactors, "MULTI_FLOOR"])] : previous.complexityFactors.filter((item) => item !== "MULTI_FLOOR") })); }} /></Field>
           </div>
         </StepSection>
