@@ -76,6 +76,7 @@ describe("Netlify contact webhook", () => {
       expect(result.propertyType).toBe(propertyType);
       expect(result.leadMessage).toContain("Kontrola prác v piatok");
       expect(result.leadMessage).toContain("Služba:");
+      if (service === "dozor") expect(result.leadMessage).toContain("Služba: Kontrola prác\n");
     }
   });
 
