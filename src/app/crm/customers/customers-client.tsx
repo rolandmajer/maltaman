@@ -3,8 +3,9 @@
 import { FormEvent, useMemo, useState } from "react";
 import { ClipboardCheck, Mail, Phone, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
-import { apiPost } from "@/lib/offline/api-client";
+import { apiDelete, apiPost } from "@/lib/offline/api-client";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,16 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: Custom
     }
   }
 
+  async function deleteCustomer(id: string) {
+    try {
+      await apiDelete(`/api/crm/customers/${id}`, "Odstránenie klienta");
+      setCustomers((items) => items.filter((customer) => customer.id !== id));
+      toast.success("Klient bol vymazaný");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Klienta sa nepodarilo vymazať");
+    }
+  }
+
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 p-4 pb-24">
       <div>
@@ -90,7 +101,14 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: Custom
             <CardContent className="space-y-2 p-4">
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-slate-900">{customer.name || customer.email}</p>
-                {customer.consentAt && <Badge variant="ok">Súhlas</Badge>}
+                <div className="flex items-center gap-1">
+                  {customer.consentAt && <Badge variant="ok">Súhlas</Badge>}
+                  <ConfirmDeleteButton
+                    title="Vymazať klienta?"
+                    description={`Klient a jeho ${customer.leadCount} CRM leadov sa natrvalo odstránia. Existujúce protokoly a cenové ponuky zostanú zachované bez väzby na klienta.`}
+                    onConfirm={() => void deleteCustomer(customer.id)}
+                  />
+                </div>
               </div>
               <p className="flex items-center gap-1.5 text-sm text-slate-600"><Mail className="size-4" /> {customer.email}</p>
               {customer.phone && <p className="flex items-center gap-1.5 text-sm text-slate-600"><Phone className="size-4" /> {customer.phone}</p>}

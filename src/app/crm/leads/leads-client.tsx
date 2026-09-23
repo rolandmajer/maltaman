@@ -4,8 +4,9 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Mail, MapPin, Phone, Plus, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { apiPatch, apiPost } from "@/lib/offline/api-client";
+import { apiDelete, apiPatch, apiPost } from "@/lib/offline/api-client";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +100,16 @@ export function LeadsClient({ initialLeads }: { initialLeads: LeadDto[] }) {
     }
   }
 
+  async function deleteLead(id: string) {
+    try {
+      await apiDelete(`/api/crm/leads/${id}`, "Odstránenie CRM leadu");
+      setLeads((items) => items.filter((lead) => lead.id !== id));
+      toast.success("Lead bol vymazaný");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Lead sa nepodarilo vymazať");
+    }
+  }
+
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 p-4 pb-24">
       <div>
@@ -160,13 +171,20 @@ export function LeadsClient({ initialLeads }: { initialLeads: LeadDto[] }) {
                   ))}
                 </SelectContent>
               </Select>
-              {lead.inspection ? (
-                <Button variant="outline" onClick={() => router.push(`/obhliadky/${lead.inspection!.id}/zakladne-udaje`)}>
-                  {lead.inspection.protocolNumber} <ArrowRight />
-                </Button>
-              ) : (
-                <Button onClick={() => convert(lead.id)}><UserRound /> Vytvoriť obhliadku</Button>
-              )}
+              <div className="flex flex-wrap justify-end gap-2">
+                {lead.inspection ? (
+                  <Button variant="outline" onClick={() => router.push(`/obhliadky/${lead.inspection!.id}/zakladne-udaje`)}>
+                    {lead.inspection.protocolNumber} <ArrowRight />
+                  </Button>
+                ) : (
+                  <Button onClick={() => convert(lead.id)}><UserRound /> Vytvoriť obhliadku</Button>
+                )}
+                <ConfirmDeleteButton
+                  title="Vymazať CRM lead?"
+                  description={lead.inspection ? "Lead sa odstráni, ale už vytvorený protokol a prípadné cenové ponuky zostanú zachované." : "Lead sa natrvalo odstráni. Klient a prípadné cenové ponuky zostanú zachované."}
+                  onConfirm={() => void deleteLead(lead.id)}
+                />
+              </div>
             </CardContent>
           </Card>
         ))}

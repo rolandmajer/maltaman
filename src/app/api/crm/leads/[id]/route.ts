@@ -20,3 +20,20 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return jsonError(error);
   }
 }
+
+export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await requireSession();
+    const { id } = await context.params;
+    const existing = await db.lead.findFirst({
+      where: { id, organisationId: user.organisationId },
+      select: { id: true },
+    });
+    if (!existing) throw new ApiError(404, "Lead nebol nájdený");
+
+    await db.lead.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
