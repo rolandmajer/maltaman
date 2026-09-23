@@ -60,6 +60,8 @@ function LineRows({ lines, optional = false }: { lines: QuotationPdf["lineItems"
 export function QuotationDocument({ quote, settings, logoBuffer }: { quote: QuotationPdf; settings: Settings; logoBuffer?: Buffer }) {
   const required = quote.lineItems.filter((line) => line.kind === "REQUIRED");
   const optional = quote.lineItems.filter((line) => line.kind === "OPTIONAL");
+  const finalPdf = ["SENT", "ACCEPTED", "CONVERTED"].includes(quote.status);
+  const visibleOptional = finalPdf ? optional.filter((line) => line.selected) : optional;
   const totals = quotationTotals(quote.lineItems, quote.discountAmount, quote.vatRatePercent, quote.pricesIncludeVat);
   const selectedOptional = optional.filter((line) => line.selected).reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
   return <Document title={`${quote.quoteNumber} – Cenová ponuka obhliadky`} author={settings.companyName || "MALTAMAN"}>
@@ -74,18 +76,14 @@ export function QuotationDocument({ quote, settings, logoBuffer }: { quote: Quot
       </View>
       <Text style={q.sectionTitle}>Povinná časť</Text>
       <LineRows lines={required} />
-      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 7, fontWeight: 700 }}><Text>Cena základnej obhliadky a cestovného</Text><Text>{formatCurrency(required.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0))}</Text></View>
-      <Text style={q.sectionTitle}>Voliteľné služby</Text>
-      <Text style={{ fontSize: 8, color: colors.muted, marginBottom: 5 }}>Vybrané služby sú označené [x]. Nevybrané služby sú informatívne a nie sú zahrnuté v celkovej cene.</Text>
-      <LineRows lines={optional} optional />
-      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 7, fontWeight: 700 }}><Text>Vybrané voliteľné služby</Text><Text>{formatCurrency(selectedOptional)}</Text></View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 7, fontWeight: 700 }}><Text>Cena základnej obhliadky a výjazdu</Text><Text>{formatCurrency(required.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0))}</Text></View>
+      {visibleOptional.length > 0 && <><Text style={q.sectionTitle}>Doplnkové služby</Text>{!finalPdf && <Text style={{ fontSize: 8, color: colors.muted, marginBottom: 5 }}>Vybrané služby sú označené [x].</Text>}<LineRows lines={visibleOptional} optional={!finalPdf} /><View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 7, fontWeight: 700 }}><Text>Vybrané doplnkové služby</Text><Text>{formatCurrency(selectedOptional)}</Text></View></>}
       <View style={q.totalBox} wrap={false}>
         {quote.discountAmount > 0 && <View style={q.totalRow}><Text>Zľava</Text><Text>− {formatCurrency(quote.discountAmount)}</Text></View>}
         <View style={q.totalRow}><Text>Bez DPH</Text><Text>{formatCurrency(totals.priceExclVat)}</Text></View>
         <View style={q.totalRow}><Text>DPH {formatNumber(quote.vatRatePercent)} %</Text><Text>{formatCurrency(totals.vatAmount)}</Text></View>
         <View style={q.grandTotal}><Text>Celkom</Text><Text>{formatCurrency(totals.priceInclVat)}</Text></View>
       </View>
-      <View style={q.note} wrap={false}><Text style={{ fontWeight: 700, marginBottom: 4 }}>Cestovné a rozsah</Text><Text>Východiskový bod: {quote.routeOrigin}. Vzdialenosť: {formatNumber(quote.oneWayDistanceKm, 1)} km jedným smerom, {formatNumber(quote.returnDistanceKm, 1)} km tam aj späť{quote.distanceManual ? " (ručne zadané)" : ""}.</Text>{quote.complexityDescription ? <Text style={{ marginTop: 4 }}>Náročnosť: {quote.complexityDescription}</Text> : null}</View>
       {quote.notes ? <View style={q.note} wrap={false}><Text style={{ fontWeight: 700, marginBottom: 4 }}>Poznámka</Text><Text>{quote.notes}</Text></View> : null}
       <View style={q.note} wrap={false}><Text style={{ fontWeight: 700, marginBottom: 4 }}>Podmienky ponuky</Text><Text>{quote.terms}</Text><Text style={{ marginTop: 4 }}>Kompletný protokol a ostatné voliteľné služby sa dodajú len vtedy, ak sú v tejto ponuke označené ako vybrané.</Text></View>
       <View style={q.signature}><Text style={q.signatureLine}>Za poskytovateľa</Text><Text style={q.signatureLine}>Súhlas klienta, dátum a podpis</Text></View>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, FileDown, Loader2, MapPin, Save, Send, Wrench } from "lucide-react";
+import { Check, Copy, FileDown, Link2, Loader2, Mail, MapPin, Save, Send, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPatch, apiPost } from "@/lib/offline/api-client";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,7 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [routing, setRouting] = useState(false);
+  const [clientFormUrl, setClientFormUrl] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -128,7 +129,7 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
     const required: QuotationLine[] = [
       { kind: "REQUIRED", code: "BASE_INSPECTION", name: pricing.label, description: `${form.floorAreaM2} m² × ${pricing.rate.toFixed(2)} €/m²`, quantity: 1, unit: "paušál", unitPrice: base, selected: true, order: 0 },
       ...(complexityPercent ? [{ kind: "REQUIRED" as const, code: "COMPLEXITY", name: `Príplatok za náročnosť (+${complexityPercent} %)`, description: "", quantity: 1, unit: "paušál", unitPrice: Math.round(base * complexityPercent) / 100, selected: true, order: 1 }] : []),
-      { kind: "REQUIRED", code: "TRAVEL", name: `Cestovné (${formatNumber(returnKm, 1)} km tam aj späť)`, description: "", quantity: 1, unit: "paušál", unitPrice: travel, selected: true, order: 2 },
+      { kind: "REQUIRED", code: "TRAVEL", name: `Výjazd technika (${formatNumber(returnKm, 1)} km tam aj späť)`, description: "", quantity: 1, unit: "paušál", unitPrice: travel, selected: true, order: 2 },
     ];
     const optional = services.map((service, order): QuotationLine => ({ kind: "OPTIONAL", code: service.code, name: service.name, description: service.description, quantity: 1, unit: service.pricingMode === "PER_M2" ? `${form.floorAreaM2} m²` : "paušál", unitPrice: locked ? service.price : optionalServicePrice(service, form.floorAreaM2), selected: form.selectedOptionalCodes.includes(service.code), order: 100 + order }));
     const lines = [...required, ...optional];
@@ -215,6 +216,43 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
     finally { setRouting(false); }
   }
 
+  async function prepareClientForm() {
+    if (!form.clientName.trim()) { toast.error("Zadajte meno klienta."); return; }
+    if (!/^\S+@\S+\.\S+$/.test(form.clientEmail.trim())) { toast.error("Zadajte platný e-mail klienta."); return; }
+    setSaving(true);
+    try {
+      let current = quote;
+      if (!current) {
+        current = await apiPost<QuoteResponse>("/api/quotations", { ...form, customerId: form.customerId || null }, "Vytvorenie formulára pre klienta");
+        setQuote(current);
+        router.replace(`/cenove-ponuky/${current.id}`);
+      } else {
+        current = await apiPatch<QuoteResponse>(`/api/quotations/${current.id}`, { ...form, customerId: form.customerId || null });
+        setQuote(current);
+      }
+      const invitation = await apiPost<{ url: string; status: string }>(`/api/quotations/${current.id}/invite`, {}, "Príprava formulára pre klienta");
+      setClientFormUrl(invitation.url);
+      setQuote((previous) => previous ? { ...previous, status: invitation.status } : previous);
+      toast.success("Formulár pre klienta je pripravený");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Formulár pre klienta sa nepodarilo pripraviť");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function copyClientFormUrl() {
+    await navigator.clipboard.writeText(clientFormUrl);
+    toast.success("Odkaz bol skopírovaný");
+  }
+
+  function openClientEmail() {
+    const subject = "Údaje k cenovej ponuke obhliadky nehnuteľnosti";
+    const greeting = form.clientName.trim() ? `Dobrý deň, ${form.clientName.trim()},` : "Dobrý deň,";
+    const body = `${greeting}\n\npre prípravu cenovej ponuky na obhliadku nehnuteľnosti, prosím, vyplňte krátky formulár na tomto odkaze:\n\n${clientFormUrl}\n\nPo odoslaní údaje skontrolujeme a pošleme vám finálnu cenovú ponuku.\n\nĎakujeme\nMALTAMAN`;
+    window.location.href = `mailto:${encodeURIComponent(form.clientEmail)}?${new URLSearchParams({ subject, body }).toString().replace(/\+/g, "%20")}`;
+  }
+
   async function convert() {
     if (!quote) return;
     try {
@@ -231,6 +269,8 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
         <div><div className="flex items-center gap-2"><h1 className="text-2xl font-bold">{quote?.quoteNumber ?? "Nová cenová ponuka"}</h1>{quote && <Badge variant="secondary">{STATUS_LABELS[quote.status]}</Badge>}</div><p className="text-sm text-slate-500">Kalkulácia obhliadky a samostatne voliteľných služieb.</p></div>
         {quote && <a href={`/api/quotations/${quote.id}/pdf`} target="_blank" rel="noreferrer"><Button variant="outline"><FileDown /> Náhľad PDF</Button></a>}
       </div>
+
+      {clientFormUrl && <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><div className="flex items-center gap-2 font-semibold text-emerald-900"><Link2 className="size-4" /> Formulár pre klienta je pripravený</div><p className="mt-1 break-all text-xs text-emerald-800">{clientFormUrl}</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => void copyClientFormUrl()}><Copy /> Kopírovať odkaz</Button><Button type="button" size="sm" onClick={openClientEmail}><Mail /> Pripraviť e-mail</Button></div></div>}
 
       <fieldset disabled={locked} className="space-y-4 disabled:opacity-80">
         <StepSection title="Klient a nehnuteľnosť">
@@ -253,12 +293,12 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
           </div>
         </StepSection>
 
-        <StepSection title="Cestovné" description={`Východisková adresa: ${settings.pricingBaseAddress}. Vzdialenosť sa účtuje tam aj späť.`}>
+        <StepSection title="Výjazd technika" description={`Východisková adresa: ${settings.pricingBaseAddress}. Vzdialenosť sa počíta tam aj späť.`}>
           <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto]">
             <Field label="Vzdialenosť jedným smerom (km)"><Input type="number" min="0" step="0.1" value={form.oneWayDistanceKm || ""} onChange={(e) => setForm((previous) => ({ ...previous, oneWayDistanceKm: parseDecimalOr(e.target.value), distanceManual: true }))} /></Field>
             <Button type="button" variant="outline" onClick={() => void calculateDistance()} disabled={routing}>{routing ? <Loader2 className="animate-spin" /> : <MapPin />} Vypočítať trasu</Button>
           </div>
-          <div className="rounded-lg bg-slate-50 p-3 text-sm"><strong>{formatNumber(preview.returnKm, 1)} km tam aj späť</strong> · cestovné {formatCurrency(preview.required.find((line) => line.code === "TRAVEL")?.unitPrice ?? 0)}{form.distanceManual && <span className="ml-2 text-amber-700">Ručne zadané</span>}</div>
+          <div className="rounded-lg bg-slate-50 p-3 text-sm"><strong>{formatNumber(preview.returnKm, 1)} km tam aj späť</strong> · výjazd {formatCurrency(preview.required.find((line) => line.code === "TRAVEL")?.unitPrice ?? 0)}{form.distanceManual && <span className="ml-2 text-amber-700">Ručne zadané</span>}</div>
         </StepSection>
 
         <StepSection title="Voliteľné služby" description="Klient si môže vybrať ľubovoľné služby. Nevybrané položky zostanú viditeľné v PDF, ale nezapočítajú sa do ceny.">
@@ -279,7 +319,8 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 backdrop-blur"><div className="mx-auto flex max-w-5xl flex-wrap justify-end gap-2">
         {!locked && <Button variant="outline" onClick={() => void save()} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />} Uložiť</Button>}
-        {quote && quote.status === "DRAFT" && <Button variant="outline" onClick={() => void setStatus("SENT")} disabled={saving}><Send /> Označiť ako odoslanú</Button>}
+        {!locked && <Button variant="outline" onClick={() => void prepareClientForm()} disabled={saving}><Mail /> Formulár klientovi</Button>}
+        {quote && ["DRAFT", "CLIENT_SELECTED"].includes(quote.status) && <Button variant="outline" onClick={() => void setStatus("SENT")} disabled={saving}><Send /> Odoslať cenovú ponuku</Button>}
         {quote && !["ACCEPTED", "CONVERTED"].includes(quote.status) && <Button onClick={() => void setStatus("ACCEPTED")} disabled={saving}><Check /> Klient prijal</Button>}
         {quote?.status === "ACCEPTED" && <Button onClick={() => void convert()}><Wrench /> Vytvoriť obhliadku</Button>}
         {quote?.inspection && <Button onClick={() => router.push(`/obhliadky/${quote.inspection!.id}/zakladne-udaje`)}><Wrench /> Otvoriť obhliadku</Button>}

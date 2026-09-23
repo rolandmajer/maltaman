@@ -25,7 +25,7 @@ export default async function QuotationsPage() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Cenové ponuky</h1>
-            <p className="text-sm text-slate-500">Cena obhliadky, cestovné a služby, ktoré si klient vyberie samostatne.</p>
+            <p className="text-sm text-slate-500">Cena obhliadky, výjazd technika a doplnkové služby podľa výberu klienta.</p>
           </div>
           <Link href="/cenove-ponuky/nova" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-800 active:bg-brand-900"><Plus className="size-4" /> Nová cenová ponuka</Link>
         </div>

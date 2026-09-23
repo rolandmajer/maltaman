@@ -243,6 +243,10 @@ model Quotation {
 
   revisionNumber Int        @default(1)
   acceptedAt     DateTime?
+  clientFormTokenHash String? @unique
+  clientFormExpiresAt DateTime?
+  clientFormSentAt DateTime?
+  clientFormSubmittedAt DateTime?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 

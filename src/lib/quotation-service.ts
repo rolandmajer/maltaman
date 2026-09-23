@@ -106,7 +106,7 @@ function buildLines(input: Required<Pick<QuotationInput, "propertyType" | "floor
   if (complexityPercent > 0) {
     lines.push({ kind: "REQUIRED", code: "COMPLEXITY", name: "Príplatok za náročnosť", description: factors.map((f) => `${f.label} (+${f.percent} %)` ).join(", ") + (factors.reduce((sum, f) => sum + f.percent, 0) > 40 ? "; príplatok zastropovaný na 40 %" : ""), quantity: 1, unit: "paušál", unitPrice: roundMoney(base * complexityPercent / 100), selected: true, order: 1 });
   }
-  lines.push({ kind: "REQUIRED", code: "TRAVEL", name: "Cestovné", description: `${returnDistanceKm.toFixed(1)} km tam aj späť z adresy ${settings.pricingBaseAddress}`, quantity: 1, unit: "paušál", unitPrice: travel, selected: true, order: 2 });
+  lines.push({ kind: "REQUIRED", code: "TRAVEL", name: "Výjazd technika", description: `${returnDistanceKm.toFixed(1)} km tam aj späť z adresy ${settings.pricingBaseAddress}`, quantity: 1, unit: "paušál", unitPrice: travel, selected: true, order: 2 });
   services.forEach((service, index) => lines.push({
     kind: "OPTIONAL",
     code: service.code,
