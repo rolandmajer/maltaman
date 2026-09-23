@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, FileDown, Link2, Loader2, Mail, MapPin, Save, Send, Wrench } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPatch, apiPost } from "@/lib/offline/api-client";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/offline/api-client";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -261,13 +262,35 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
     } catch (error) { toast.error(error instanceof Error ? error.message : "Vytvorenie obhliadky zlyhalo"); }
   }
 
+  async function deleteQuotation() {
+    if (!quote) return;
+    setSaving(true);
+    try {
+      await apiDelete(`/api/quotations/${quote.id}`, "Odstránenie cenovej ponuky");
+      toast.success("Cenová ponuka bola vymazaná");
+      router.replace("/cenove-ponuky");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Cenovú ponuku sa nepodarilo vymazať");
+      setSaving(false);
+    }
+  }
+
   if (loading || !settings || !preview) return <main className="mx-auto max-w-5xl p-4"><p className="text-sm text-slate-500">Načítavam kalkulátor…</p></main>;
 
   return (
     <main className="mx-auto max-w-5xl p-4 pb-28">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div><div className="flex items-center gap-2"><h1 className="text-2xl font-bold">{quote?.quoteNumber ?? "Nová cenová ponuka"}</h1>{quote && <Badge variant="secondary">{STATUS_LABELS[quote.status]}</Badge>}</div><p className="text-sm text-slate-500">Kalkulácia obhliadky a samostatne voliteľných služieb.</p></div>
-        {quote && <a href={`/api/quotations/${quote.id}/pdf`} target="_blank" rel="noreferrer"><Button variant="outline"><FileDown /> Náhľad PDF</Button></a>}
+        {quote && <div className="flex flex-wrap gap-2">
+          <a href={`/api/quotations/${quote.id}/pdf`} target="_blank" rel="noreferrer"><Button variant="outline"><FileDown /> Náhľad PDF</Button></a>
+          <ConfirmDeleteButton
+            label="Vymazať ponuku"
+            title="Vymazať cenovú ponuku?"
+            description={quote.inspection ? "Ponuka sa natrvalo odstráni. Vytvorený protokol zostane zachovaný, ale už nebude prepojený s touto ponukou." : "Cenová ponuka sa natrvalo odstráni. Klient a dopyt zostanú zachované. Táto akcia sa nedá vrátiť späť."}
+            onConfirm={() => void deleteQuotation()}
+          />
+        </div>}
       </div>
 
       {clientFormUrl && <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><div className="flex items-center gap-2 font-semibold text-emerald-900"><Link2 className="size-4" /> Formulár pre klienta je pripravený</div><p className="mt-1 break-all text-xs text-emerald-800">{clientFormUrl}</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => void copyClientFormUrl()}><Copy /> Kopírovať odkaz</Button><Button type="button" size="sm" onClick={openClientEmail}><Mail /> Pripraviť e-mail</Button></div></div>}

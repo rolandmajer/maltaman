@@ -34,10 +34,7 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   try {
     const user = await requireSession();
     const { id } = await ctx.params;
-    const quotation = await requireQuotationAccess(id, user.organisationId);
-    if (quotation.status === "ACCEPTED" || quotation.status === "CONVERTED") {
-      return NextResponse.json({ error: "Prijatú alebo prevedenú cenovú ponuku nie je možné vymazať" }, { status: 409 });
-    }
+    await requireQuotationAccess(id, user.organisationId);
     await db.quotation.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (error) {
