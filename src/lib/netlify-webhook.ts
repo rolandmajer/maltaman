@@ -80,7 +80,7 @@ const SERVICE_NAMES = {
   dom: "Obhliadka domu pred kúpou",
   novostavba: "Preberanie novostavby",
   konzultacia: "Konzultácia pred rekonštrukciou",
-  dozor: "Stavebný dozor / kontrola prác",
+  dozor: "Kontrola prác",
 } as const;
 
 export function parseNetlifyContactPayload(value: unknown) {
