@@ -1,4 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { z } from "zod";
+import { propertyTypeForWebsiteService } from "@/lib/website-intake";
 
 type NetlifySignaturePayload = {
   iss?: string;
@@ -57,5 +59,53 @@ export function parseNetlifyChecklistPayload(value: unknown) {
     propertyAddress: text(data.propertyAddress ?? data.address),
     propertyType: text(data.propertyType),
     message: text(data.message),
+  };
+}
+
+const contactSubmissionSchema = z.object({
+  id: z.string().trim().min(1),
+  formName: z.literal("contact"),
+  name: z.string().trim().min(2).max(150),
+  email: z.email().max(200),
+  phone: z.string().trim().min(6).max(50),
+  service: z.enum(["byt", "dom", "novostavba", "konzultacia", "dozor"]),
+  location: z.string().trim().min(2).max(300),
+  message: z.string().trim().max(3000),
+  consent: z.literal(true),
+  botField: z.string().trim().max(0),
+});
+
+const SERVICE_NAMES = {
+  byt: "Obhliadka bytu pred kúpou",
+  dom: "Obhliadka domu pred kúpou",
+  novostavba: "Preberanie novostavby",
+  konzultacia: "Konzultácia pred rekonštrukciou",
+  dozor: "Kontrola prác",
+} as const;
+
+export function parseNetlifyContactPayload(value: unknown) {
+  const root = record(value);
+  const payload = record(root.payload);
+  const data = record(payload.data ?? root.data);
+  const service = text(data.service);
+  const parsed = contactSubmissionSchema.parse({
+    id: text(payload.id ?? root.id),
+    formName: text(payload.form_name ?? root.form_name),
+    name: text(data.name),
+    email: text(data.email).toLowerCase(),
+    phone: text(data.phone),
+    service,
+    location: text(data.location),
+    message: text(data.message),
+    consent: data.consent === true || data.consent === "on" || data.consent === "true",
+    botField: text(data["bot-field"]),
+  });
+  return {
+    ...parsed,
+    externalId: `netlify:contact:${parsed.id}`,
+    propertyType: parsed.service === "byt" || parsed.service === "dom" || parsed.service === "novostavba"
+      ? propertyTypeForWebsiteService(parsed.service)
+      : "",
+    leadMessage: [`Služba: ${SERVICE_NAMES[parsed.service]}`, parsed.message].filter(Boolean).join("\n\n"),
   };
 }
