@@ -91,13 +91,13 @@ model AppSettings {
   pricingBaseAddress      String @default("Martin, Slovensko")
   quoteValidityDays       Int    @default(14)
   apartmentRatePerM2      Float  @default(2.5)
-  apartmentMinimumPrice  Float  @default(180)
+  apartmentMinimumPrice  Float  @default(169)
   houseRatePerM2          Float  @default(3)
-  houseMinimumPrice       Float  @default(280)
+  houseMinimumPrice       Float  @default(279)
   otherRatePerM2          Float  @default(3)
   otherMinimumPrice       Float  @default(250)
   shellRatePerM2          Float  @default(2.25)
-  shellMinimumPrice       Float  @default(200)
+  shellMinimumPrice       Float  @default(199)
   fullProtocolRatePerM2   Float  @default(1.2)
   fullProtocolMinimum     Float  @default(120)
   travelFreeUpToKm        Float  @default(30)
@@ -290,6 +290,9 @@ model Lead {
 
   propertyAddress String @default("")
   propertyType    String @default("")
+  requestedService String @default("")
+  floorAreaM2      Float  @default(0)
+  requestedOptionalCodes String @default("[]")
   message         String @default("")
   nextActionAt    DateTime?
   externalId      String?

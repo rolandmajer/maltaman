@@ -106,6 +106,9 @@ export const leadSchema = z.object({
   source: leadSourceSchema.optional(),
   propertyAddress: z.string().trim().optional(),
   propertyType: z.string().trim().optional(),
+  requestedService: z.string().trim().optional(),
+  floorAreaM2: z.coerce.number().nonnegative().optional(),
+  requestedOptionalCodes: z.array(z.string()).optional(),
   message: z.string().trim().optional(),
   nextActionAt: nullableDate(),
 });
@@ -132,6 +135,7 @@ export const quotationCreateSchema = z.object({
   propertyType: quotationPropertyTypeSchema.default("APARTMENT"),
   floorAreaM2: z.coerce.number().nonnegative().default(0),
   baseRatePerM2: z.coerce.number().nonnegative().optional(),
+  minimumPrice: z.coerce.number().nonnegative().optional(),
   floors: z.coerce.number().int().min(1).default(1),
   complexityFactors: z.array(z.string()).default([]),
   oneWayDistanceKm: z.coerce.number().nonnegative().default(0),

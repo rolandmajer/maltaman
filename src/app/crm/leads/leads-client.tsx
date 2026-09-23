@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Mail, MapPin, Phone, Plus, UserRound } from "lucide-react";
+import { ArrowRight, Calculator, Mail, MapPin, Phone, Plus, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { apiDelete, apiPatch, apiPost } from "@/lib/offline/api-client";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DEFAULT_QUOTE_OPTIONAL_SERVICES } from "@/lib/quotation-calculations";
 
 const STATUS_LABELS = {
   NEW: "Nový",
@@ -32,17 +33,29 @@ const SOURCE_LABELS = {
 type LeadStatus = keyof typeof STATUS_LABELS;
 type LeadSource = keyof typeof SOURCE_LABELS;
 
+const SERVICE_LABELS: Record<string, string> = {
+  byt: "Obhliadka bytu",
+  dom: "Obhliadka domu",
+  novostavba: "Preberanie novostavby",
+  rekonstrukcia: "Konzultácia pred rekonštrukciou",
+  kontrola_ponuky: "Kontrola cenovej ponuky",
+};
+
 export type LeadDto = {
   id: string;
   status: LeadStatus;
   source: LeadSource;
   propertyAddress: string;
   propertyType: string;
+  requestedService: string;
+  floorAreaM2: number;
+  requestedOptionalCodes: string[];
   message: string;
   nextActionAt: string | null;
   createdAt: string;
   customer: { id: string; name: string; email: string; phone: string };
   inspection: { id: string; protocolNumber: string } | null;
+  quotation: { id: string; quoteNumber: string } | null;
 };
 
 export function LeadsClient({ initialLeads }: { initialLeads: LeadDto[] }) {
@@ -97,6 +110,19 @@ export function LeadsClient({ initialLeads }: { initialLeads: LeadDto[] }) {
       router.push(`/obhliadky/${result.inspectionId}/zakladne-udaje`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Obhliadku sa nepodarilo vytvoriť");
+    }
+  }
+
+  async function createQuotation(id: string) {
+    try {
+      const result = await apiPost<{ quotationId: string }>(
+        `/api/crm/leads/${id}/quotation`,
+        {},
+        "Vytvorenie cenovej ponuky z leadu"
+      );
+      router.push(`/cenove-ponuky/${result.quotationId}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Cenovú ponuku sa nepodarilo vytvoriť");
     }
   }
 
@@ -161,6 +187,14 @@ export function LeadsClient({ initialLeads }: { initialLeads: LeadDto[] }) {
                 <p className="flex items-center gap-1.5 text-sm text-slate-600"><Mail className="size-4" /> {lead.customer.email}</p>
                 {lead.customer.phone && <p className="flex items-center gap-1.5 text-sm text-slate-600"><Phone className="size-4" /> {lead.customer.phone}</p>}
                 {lead.propertyAddress && <p className="flex items-center gap-1.5 text-sm text-slate-600"><MapPin className="size-4" /> {lead.propertyAddress}</p>}
+                {(lead.requestedService || lead.floorAreaM2 > 0) && <p className="pt-1 text-sm font-medium text-slate-700">
+                  {SERVICE_LABELS[lead.requestedService] ?? lead.requestedService}{lead.floorAreaM2 > 0 ? ` · ${lead.floorAreaM2} m²` : ""}
+                </p>}
+                {lead.requestedOptionalCodes.length > 0 && <div className="flex flex-wrap gap-1 pt-1">
+                  {lead.requestedOptionalCodes.map((code) => <Badge key={code} variant="outline">
+                    {DEFAULT_QUOTE_OPTIONAL_SERVICES.find((service) => service.code === code)?.name ?? code}
+                  </Badge>)}
+                </div>}
                 {lead.message && <p className="pt-1 text-sm text-slate-500">{lead.message}</p>}
               </div>
               <Select value={lead.status} onValueChange={(value) => updateStatus(lead.id, value as LeadStatus)}>
@@ -172,6 +206,13 @@ export function LeadsClient({ initialLeads }: { initialLeads: LeadDto[] }) {
                 </SelectContent>
               </Select>
               <div className="flex flex-wrap justify-end gap-2">
+                {lead.quotation ? (
+                  <Button variant="outline" onClick={() => router.push(`/cenove-ponuky/${lead.quotation!.id}`)}>
+                    {lead.quotation.quoteNumber} <ArrowRight />
+                  </Button>
+                ) : (
+                  <Button variant="outline" onClick={() => void createQuotation(lead.id)}><Calculator /> Vytvoriť ponuku</Button>
+                )}
                 {lead.inspection ? (
                   <Button variant="outline" onClick={() => router.push(`/obhliadky/${lead.inspection!.id}/zakladne-udaje`)}>
                     {lead.inspection.protocolNumber} <ArrowRight />

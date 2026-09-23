@@ -6,6 +6,8 @@ describe("website intake", () => {
     expect(propertyTypeForWebsiteService("byt")).toBe("APARTMENT");
     expect(propertyTypeForWebsiteService("dom")).toBe("HOUSE");
     expect(propertyTypeForWebsiteService("novostavba")).toBe("SHELL");
+    expect(propertyTypeForWebsiteService("rekonstrukcia")).toBe("OTHER");
+    expect(propertyTypeForWebsiteService("kontrola_ponuky")).toBe("OTHER");
   });
 
   it("rejects a filled honeypot", () => {

@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
       include: {
         customer: true,
         inspection: { select: { id: true, protocolNumber: true } },
+        quotations: { select: { id: true, quoteNumber: true }, orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
     return NextResponse.json(leads);
@@ -53,6 +54,9 @@ export async function POST(req: NextRequest) {
       source: data.source ?? "MANUAL",
       propertyAddress: data.propertyAddress,
       propertyType: data.propertyType,
+      requestedService: data.requestedService,
+      floorAreaM2: data.floorAreaM2,
+      requestedOptionalCodes: data.requestedOptionalCodes,
       message: data.message,
       nextActionAt: data.nextActionAt ?? undefined,
     });
@@ -61,6 +65,7 @@ export async function POST(req: NextRequest) {
       include: {
         customer: true,
         inspection: { select: { id: true, protocolNumber: true } },
+        quotations: { select: { id: true, quoteNumber: true }, orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
     return NextResponse.json(lead, { status: 201 });

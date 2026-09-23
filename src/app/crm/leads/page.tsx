@@ -12,6 +12,7 @@ export default async function LeadsPage() {
     include: {
       customer: true,
       inspection: { select: { id: true, protocolNumber: true } },
+      quotations: { select: { id: true, quoteNumber: true }, orderBy: { createdAt: "desc" }, take: 1 },
     },
   });
 
@@ -21,6 +22,9 @@ export default async function LeadsPage() {
     source: lead.source,
     propertyAddress: lead.propertyAddress,
     propertyType: lead.propertyType,
+    requestedService: lead.requestedService,
+    floorAreaM2: lead.floorAreaM2,
+    requestedOptionalCodes: JSON.parse(lead.requestedOptionalCodes || "[]"),
     message: lead.message,
     nextActionAt: lead.nextActionAt?.toISOString() ?? null,
     createdAt: lead.createdAt.toISOString(),
@@ -31,6 +35,7 @@ export default async function LeadsPage() {
       phone: lead.customer.phone,
     },
     inspection: lead.inspection,
+    quotation: lead.quotations[0] ?? null,
   }));
 
   return (

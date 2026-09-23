@@ -35,6 +35,7 @@ export type QuotationInput = {
   propertyType?: PropertyPricingType;
   floorAreaM2?: number;
   baseRatePerM2?: number;
+  minimumPrice?: number;
   floors?: number;
   complexityFactors?: string[];
   oneWayDistanceKm?: number;
@@ -83,9 +84,9 @@ function selectedWithDependencies(codes: string[], services: QuoteOptionalServic
   return selected;
 }
 
-function buildLines(input: Required<Pick<QuotationInput, "propertyType" | "floorAreaM2" | "complexityFactors" | "oneWayDistanceKm" | "selectedOptionalCodes">> & Pick<QuotationInput, "baseRatePerM2">, settings: AppSettingsModel) {
+function buildLines(input: Required<Pick<QuotationInput, "propertyType" | "floorAreaM2" | "complexityFactors" | "oneWayDistanceKm" | "selectedOptionalCodes">> & Pick<QuotationInput, "baseRatePerM2" | "minimumPrice">, settings: AppSettingsModel) {
   const configuredPricing = rateFor(input.propertyType, settings);
-  const pricing = { ...configuredPricing, rate: input.baseRatePerM2 ?? configuredPricing.rate };
+  const pricing = { ...configuredPricing, rate: input.baseRatePerM2 ?? configuredPricing.rate, minimum: input.minimumPrice ?? configuredPricing.minimum };
   const base = baseInspectionPrice(input.floorAreaM2, pricing.rate, pricing.minimum);
   const complexityPercent = complexityPercentFor(input.complexityFactors);
   const returnDistanceKm = roundMoney(input.oneWayDistanceKm * 2);
@@ -101,7 +102,7 @@ function buildLines(input: Required<Pick<QuotationInput, "propertyType" | "floor
   const services = safeServices(settings.quoteOptionalServices, settings);
   const selected = selectedWithDependencies(input.selectedOptionalCodes, services);
   const lines: QuotationLine[] = [
-    { kind: "REQUIRED", code: "BASE_INSPECTION", name: pricing.label, description: `${input.floorAreaM2} m² × ${pricing.rate.toFixed(2)} €/m²; minimálna cena ${pricing.minimum.toFixed(2)} €`, quantity: 1, unit: "paušál", unitPrice: base, selected: true, order: 0 },
+    { kind: "REQUIRED", code: "BASE_INSPECTION", name: pricing.label, description: pricing.rate > 0 && input.floorAreaM2 > 0 ? `${input.floorAreaM2} m² × ${pricing.rate.toFixed(2)} €/m²; minimálna cena ${pricing.minimum.toFixed(2)} €` : `Základná cena ${pricing.minimum.toFixed(2)} €`, quantity: 1, unit: "paušál", unitPrice: base, selected: true, order: 0 },
   ];
   if (complexityPercent > 0) {
     lines.push({ kind: "REQUIRED", code: "COMPLEXITY", name: "Príplatok za náročnosť", description: factors.map((f) => `${f.label} (+${f.percent} %)` ).join(", ") + (factors.reduce((sum, f) => sum + f.percent, 0) > 40 ? "; príplatok zastropovaný na 40 %" : ""), quantity: 1, unit: "paušál", unitPrice: roundMoney(base * complexityPercent / 100), selected: true, order: 1 });
@@ -144,7 +145,7 @@ export async function createQuotation(params: { organisationId: string; createdB
   const area = params.input.floorAreaM2 ?? 0;
   const complexityFactors = params.input.complexityFactors ?? [];
   const selectedOptionalCodes = params.input.selectedOptionalCodes ?? [];
-  const built = buildLines({ propertyType: type, floorAreaM2: area, baseRatePerM2: params.input.baseRatePerM2, complexityFactors, oneWayDistanceKm: params.input.oneWayDistanceKm ?? 0, selectedOptionalCodes }, settings);
+  const built = buildLines({ propertyType: type, floorAreaM2: area, baseRatePerM2: params.input.baseRatePerM2, minimumPrice: params.input.minimumPrice, complexityFactors, oneWayDistanceKm: params.input.oneWayDistanceKm ?? 0, selectedOptionalCodes }, settings);
   const quoteNumber = await nextQuoteNumber(params.organisationId, settings.quoteNumberPrefix);
   return db.quotation.create({
     data: {
@@ -218,10 +219,11 @@ export async function updateQuotation(quotationId: string, organisationId: strin
   const propertyType = (input.propertyType ?? existing.propertyType) as PropertyPricingType;
   const floorAreaM2 = input.floorAreaM2 ?? existing.floorAreaM2;
   const baseRatePerM2 = input.baseRatePerM2 ?? existing.baseRatePerM2;
+  const minimumPrice = input.minimumPrice ?? existing.minimumPrice;
   const complexityFactors = input.complexityFactors ?? (JSON.parse(existing.complexityFactors || "[]") as string[]);
   const selectedOptionalCodes = input.selectedOptionalCodes ?? existing.lineItems.filter((line) => line.kind === "OPTIONAL" && line.selected).map((line) => line.code);
   const oneWayDistanceKm = input.oneWayDistanceKm ?? existing.oneWayDistanceKm;
-  const built = buildLines({ propertyType, floorAreaM2, baseRatePerM2, complexityFactors, oneWayDistanceKm, selectedOptionalCodes }, settings);
+  const built = buildLines({ propertyType, floorAreaM2, baseRatePerM2, minimumPrice, complexityFactors, oneWayDistanceKm, selectedOptionalCodes }, settings);
   await db.$transaction(async (tx) => {
     await tx.quotationLineItem.deleteMany({ where: { quotationId } });
     await tx.quotation.update({

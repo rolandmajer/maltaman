@@ -76,6 +76,9 @@ export async function createLead(params: {
   source: LeadSource;
   propertyAddress?: string;
   propertyType?: string;
+  requestedService?: string;
+  floorAreaM2?: number;
+  requestedOptionalCodes?: string[];
   message?: string;
   nextActionAt?: Date;
   externalId?: string;
@@ -99,6 +102,9 @@ export async function createLead(params: {
       source: params.source,
       propertyAddress: params.propertyAddress?.trim() ?? "",
       propertyType: params.propertyType?.trim() ?? "",
+      requestedService: params.requestedService?.trim() ?? "",
+      floorAreaM2: params.floorAreaM2 ?? 0,
+      requestedOptionalCodes: JSON.stringify(params.requestedOptionalCodes ?? []),
       message: params.message?.trim() ?? "",
       nextActionAt: params.nextActionAt,
       externalId: params.externalId,
