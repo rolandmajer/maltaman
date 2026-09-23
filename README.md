@@ -204,6 +204,14 @@ is public at the routing layer so Netlify can reach it, but every request must c
 Duplicate Netlify submissions are idempotent by their external submission ID. The checklist
 e-mail creates or updates a customer, then creates a `CHECKLIST` lead with recorded consent.
 
+For the website's `contact` form, add a separate Netlify form notification pointing to
+`https://maltaman.fly.dev/api/integrations/netlify/contact` with the same JWS secret. Each
+signed submission creates or updates the customer and creates one `WEBSITE` lead in
+`/crm/leads`, preserving the selected service, location, and message. The notification accepts
+all five services on the public form, including consultation and site supervision. The Netlify
+submission ID prevents duplicate leads when a notification is retried. Keep the contact form's
+existing Netlify submission active; it is the source for this notification.
+
 ## Testing
 
 - **Unit** (`src/**/*.test.ts(x)`, Vitest): cost/VAT/contingency math, step-completion logic,
