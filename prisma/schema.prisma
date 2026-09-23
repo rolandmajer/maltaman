@@ -25,6 +25,7 @@ model Organisation {
   inspections        Inspection[]
   customers          Customer[]
   leads              Lead[]
+  quotations         Quotation[]
   settings           AppSettings?
   customPresetValues CustomPresetValue[]
 }
@@ -48,6 +49,7 @@ model User {
 
   inspectionsCreated Inspection[]     @relation("InspectionCreatedBy")
   reportRevisions    ReportRevision[]
+  quotationsCreated  Quotation[]       @relation("QuotationCreatedBy")
 
   @@index([organisationId])
 }
@@ -84,6 +86,27 @@ model AppSettings {
 
   costCategoryPresets String @default("[]") // JSON string[] of default cost category names, editable
   roomTypePresets     String @default("[]") // JSON string[] of default room type names, editable
+
+  quoteNumberPrefix       String @default("CP")
+  pricingBaseAddress      String @default("Martin, Slovensko")
+  quoteValidityDays       Int    @default(14)
+  apartmentRatePerM2      Float  @default(2.5)
+  apartmentMinimumPrice  Float  @default(180)
+  houseRatePerM2          Float  @default(3)
+  houseMinimumPrice       Float  @default(280)
+  otherRatePerM2          Float  @default(3)
+  otherMinimumPrice       Float  @default(250)
+  shellRatePerM2          Float  @default(2.25)
+  shellMinimumPrice       Float  @default(200)
+  fullProtocolRatePerM2   Float  @default(1.2)
+  fullProtocolMinimum     Float  @default(120)
+  travelFreeUpToKm        Float  @default(30)
+  travelBandTwoUpToKm     Float  @default(60)
+  travelBandTwoPrice      Float  @default(20)
+  travelBandThreeUpToKm   Float  @default(100)
+  travelBandThreePrice    Float  @default(40)
+  travelOverBandRatePerKm Float  @default(0.4)
+  quoteOptionalServices   String @default("[]") // JSON QuoteOptionalServicePreset[]
 }
 
 // ---------------------------------------------------------------------------
@@ -142,12 +165,113 @@ model Customer {
 
   leads       Lead[]
   inspections Inspection[]
+  quotations  Quotation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([organisationId, emailNormalized])
   @@index([organisationId, name])
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  AWAITING_SELECTION
+  CLIENT_SELECTED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+enum QuotationLineKind {
+  REQUIRED
+  OPTIONAL
+}
+
+/// A commercial quotation is deliberately separate from an inspection's repair-cost estimate.
+/// All client/property/rate fields are snapshots, so changing the price list never rewrites an
+/// already-issued quotation.
+model Quotation {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdById    String
+  createdBy      User         @relation("QuotationCreatedBy", fields: [createdById], references: [id])
+  customerId     String?
+  customer       Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  leadId         String?
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  inspectionId   String?      @unique
+  inspection     Inspection?  @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+
+  quoteNumber String
+  status      QuotationStatus @default(DRAFT)
+  issuedAt    DateTime        @default(now())
+  validUntil  DateTime?
+
+  clientName  String @default("")
+  clientEmail String @default("")
+  clientPhone String @default("")
+
+  propertyAddress String @default("")
+  propertyType    String @default("APARTMENT")
+  floorAreaM2     Float  @default(0)
+  floors          Int    @default(1)
+
+  baseRatePerM2 Float @default(0)
+  minimumPrice Float @default(0)
+
+  furnishingLevel       String @default("NORMAL")
+  complexityFactors     String @default("[]") // JSON string[] snapshot of selected factor codes
+  complexityPercent     Float  @default(0)
+  complexityDescription String @default("")
+
+  routeOrigin      String  @default("")
+  oneWayDistanceKm Float   @default(0)
+  returnDistanceKm Float   @default(0)
+  travelCharge     Float   @default(0)
+  distanceManual   Boolean @default(false)
+  routeNote        String  @default("")
+
+  discountAmount Float   @default(0)
+  vatRatePercent Float   @default(23)
+  pricesIncludeVat Boolean @default(true)
+  notes            String @default("")
+  terms            String @default("Cena vychádza z údajov poskytnutých pred obhliadkou. Pri podstatnej zmene rozsahu, výmery alebo prístupnosti bude zmena ceny vopred odsúhlasená klientom.")
+
+  revisionNumber Int        @default(1)
+  acceptedAt     DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  lineItems QuotationLineItem[]
+
+  @@unique([organisationId, quoteNumber])
+  @@index([organisationId, status])
+  @@index([customerId])
+  @@index([leadId])
+}
+
+model QuotationLineItem {
+  id          String            @id @default(cuid())
+  quotationId String
+  quotation   Quotation         @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  kind        QuotationLineKind
+  code        String            @default("")
+  name        String
+  description String            @default("")
+  quantity    Float             @default(1)
+  unit        String            @default("paušál")
+  unitPrice   Float             @default(0)
+  selected    Boolean           @default(true)
+  order       Int               @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quotationId, kind, order])
 }
 
 model Lead {
@@ -168,6 +292,7 @@ model Lead {
 
   inspectionId String?     @unique
   inspection   Inspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  quotations   Quotation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -251,6 +376,7 @@ model Inspection {
   reportRevisions ReportRevision[]
   amenityPlaces   AmenityPlace[]
   lead            Lead?
+  quotation       Quotation?
 
   @@unique([organisationId, protocolNumber])
   @@index([organisationId, status])

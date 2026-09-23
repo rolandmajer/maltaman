@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -33,10 +34,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DEFAULT_COST_CATEGORIES } from "@/lib/constants";
+import { DEFAULT_QUOTE_OPTIONAL_SERVICES, type QuoteOptionalServicePreset } from "@/lib/quotation-calculations";
 import type { z } from "zod";
 
-type SettingsValues = z.infer<typeof appSettingsUpdateSchema>;
-type SettingsResponse = SettingsValues & { logoUrl: string | null };
+// Keep React Hook Form's Path<T> calculation shallow. Feeding the full inferred Zod settings type
+// (which now includes an array of service objects) into every generic TextField causes TypeScript
+// to recursively enumerate paths that these scalar forms never use.
+type SettingsValues = Record<string, string | number | boolean | null | undefined>;
+type SettingsResponse = z.infer<typeof appSettingsUpdateSchema> & { logoUrl: string | null };
 
 export function SettingsClient({ isAdmin, currentUserId }: { isAdmin: boolean; currentUserId: string }) {
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
@@ -121,6 +126,10 @@ export function SettingsClient({ isAdmin, currentUserId }: { isAdmin: boolean; c
       </StepSection>
 
       <ProtocolDefaultsSection settings={settings} onSaved={setSettings} />
+
+      <QuotationPricingSection settings={settings} onSaved={setSettings} />
+
+      <QuotationServicesSection settings={settings} onSaved={setSettings} />
 
       <LegalSection settings={settings} onSaved={setSettings} />
 
@@ -559,7 +568,7 @@ function CompanySection({
     onSave: async (values) => {
       try {
         await apiPatch("/api/settings", values);
-        onSaved({ ...settings, ...values });
+        onSaved({ ...settings, ...values } as SettingsResponse);
       } catch {
         toast.error("Uloženie zlyhalo");
       }
@@ -600,7 +609,7 @@ function ProtocolDefaultsSection({
     onSave: async (values) => {
       try {
         await apiPatch("/api/settings", values);
-        onSaved({ ...settings, ...values });
+        onSaved({ ...settings, ...values } as SettingsResponse);
       } catch {
         toast.error("Uloženie zlyhalo");
       }
@@ -634,6 +643,132 @@ function ProtocolDefaultsSection({
   );
 }
 
+function QuotationPricingSection({
+  settings,
+  onSaved,
+}: {
+  settings: SettingsResponse;
+  onSaved: (s: SettingsResponse) => void;
+}) {
+  const form = useAutosaveForm<SettingsValues>({
+    schema: appSettingsUpdateSchema,
+    defaultValues: {
+      quoteNumberPrefix: settings.quoteNumberPrefix,
+      pricingBaseAddress: settings.pricingBaseAddress,
+      quoteValidityDays: settings.quoteValidityDays,
+      apartmentRatePerM2: settings.apartmentRatePerM2,
+      apartmentMinimumPrice: settings.apartmentMinimumPrice,
+      houseRatePerM2: settings.houseRatePerM2,
+      houseMinimumPrice: settings.houseMinimumPrice,
+      otherRatePerM2: settings.otherRatePerM2,
+      otherMinimumPrice: settings.otherMinimumPrice,
+      shellRatePerM2: settings.shellRatePerM2,
+      shellMinimumPrice: settings.shellMinimumPrice,
+      fullProtocolRatePerM2: settings.fullProtocolRatePerM2,
+      fullProtocolMinimum: settings.fullProtocolMinimum,
+      travelFreeUpToKm: settings.travelFreeUpToKm,
+      travelBandTwoUpToKm: settings.travelBandTwoUpToKm,
+      travelBandTwoPrice: settings.travelBandTwoPrice,
+      travelBandThreeUpToKm: settings.travelBandThreeUpToKm,
+      travelBandThreePrice: settings.travelBandThreePrice,
+      travelOverBandRatePerKm: settings.travelOverBandRatePerKm,
+    },
+    onSave: async (values) => {
+      try {
+        await apiPatch("/api/settings", values);
+        onSaved({ ...settings, ...values } as SettingsResponse);
+      } catch {
+        toast.error("Uloženie cenníka zlyhalo");
+      }
+    },
+  });
+
+  return (
+    <StepSection title="Cenník obhliadok" description="Hodnoty kalkulátora cenovej ponuky. Zmeny neprepíšu už vystavené a prijaté ponuky.">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <TextField form={form} name="quoteNumberPrefix" label="Prefix cenovej ponuky" />
+        <TextField form={form} name="quoteValidityDays" label="Platnosť ponuky (dni)" type="number" />
+        <TextField form={form} name="pricingBaseAddress" label="Východisková adresa pre cestovné" className="sm:col-span-2" />
+        <TextField form={form} name="apartmentRatePerM2" label="Byt – cena za m² (€)" type="number" />
+        <TextField form={form} name="apartmentMinimumPrice" label="Byt – minimálna cena (€)" type="number" />
+        <TextField form={form} name="houseRatePerM2" label="Rodinný dom – cena za m² (€)" type="number" />
+        <TextField form={form} name="houseMinimumPrice" label="Rodinný dom – minimálna cena (€)" type="number" />
+        <TextField form={form} name="shellRatePerM2" label="Holostavba – cena za m² (€)" type="number" />
+        <TextField form={form} name="shellMinimumPrice" label="Holostavba – minimálna cena (€)" type="number" />
+        <TextField form={form} name="otherRatePerM2" label="Iná nehnuteľnosť – cena za m² (€)" type="number" />
+        <TextField form={form} name="otherMinimumPrice" label="Iná nehnuteľnosť – minimálna cena (€)" type="number" />
+        <TextField form={form} name="fullProtocolRatePerM2" label="Kompletný protokol – cena za m² (€)" type="number" />
+        <TextField form={form} name="fullProtocolMinimum" label="Kompletný protokol – minimum (€)" type="number" />
+      </div>
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <p className="mb-3 text-sm font-medium">Cestovné – vzdialenosť tam aj späť</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <TextField form={form} name="travelFreeUpToKm" label="Zdarma do (km)" type="number" />
+          <TextField form={form} name="travelBandTwoUpToKm" label="Druhé pásmo do (km)" type="number" />
+          <TextField form={form} name="travelBandTwoPrice" label="Cena druhého pásma (€)" type="number" />
+          <TextField form={form} name="travelBandThreeUpToKm" label="Tretie pásmo do (km)" type="number" />
+          <TextField form={form} name="travelBandThreePrice" label="Cena tretieho pásma (€)" type="number" />
+          <TextField form={form} name="travelOverBandRatePerKm" label="Nad pásmo – cena za km (€)" type="number" />
+        </div>
+      </div>
+    </StepSection>
+  );
+}
+
+function QuotationServicesSection({
+  settings,
+  onSaved,
+}: {
+  settings: SettingsResponse;
+  onSaved: (s: SettingsResponse) => void;
+}) {
+  const initial = settings.quoteOptionalServices?.length ? settings.quoteOptionalServices : DEFAULT_QUOTE_OPTIONAL_SERVICES;
+  const [services, setServices] = useState<QuoteOptionalServicePreset[]>(initial);
+  const [saving, setSaving] = useState(false);
+
+  async function save(next: QuoteOptionalServicePreset[]) {
+    setServices(next);
+    setSaving(true);
+    try {
+      await apiPatch("/api/settings", { quoteOptionalServices: next });
+      onSaved({ ...settings, quoteOptionalServices: next });
+    } catch {
+      toast.error("Uloženie voliteľných služieb zlyhalo");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <StepSection
+      title="Voliteľné služby v cenovej ponuke"
+      description="Klient uvidí každú službu samostatne a do celkovej ceny sa započítajú len vybrané položky."
+      actions={<Button size="sm" variant="outline" onClick={() => void save([...services, { code: `CUSTOM_${Date.now()}`, name: "Nová služba", description: "", pricingMode: "FIXED", price: 0 }])}><Plus /> Pridať službu</Button>}
+    >
+      <div className="space-y-3">
+        {services.map((service, index) => (
+          <div key={service.code} className="rounded-lg border border-slate-200 p-3">
+            <div className="grid gap-3 sm:grid-cols-[1fr_140px_120px_120px_auto]">
+              <div className="space-y-2">
+                <Input value={service.name} aria-label="Názov služby" onChange={(e) => setServices((current) => current.map((item, i) => i === index ? { ...item, name: e.target.value } : item))} />
+                <Input value={service.description} aria-label="Popis služby" placeholder="Krátky popis pre klienta" onChange={(e) => setServices((current) => current.map((item, i) => i === index ? { ...item, description: e.target.value } : item))} />
+              </div>
+              <NativeSelectField label="Spôsob ceny" value={service.pricingMode} onChange={(value) => setServices((current) => current.map((item, i) => i === index ? { ...item, pricingMode: value as "FIXED" | "PER_M2" } : item))}>
+                <option value="FIXED">Pevná cena</option><option value="PER_M2">Cena za m²</option>
+              </NativeSelectField>
+              <div className="flex flex-col gap-1.5"><Label>Cena (€)</Label><Input type="number" min="0" step="0.01" value={service.price} onChange={(e) => setServices((current) => current.map((item, i) => i === index ? { ...item, price: Number(e.target.value) || 0 } : item))} /></div>
+              <div className="flex flex-col gap-1.5"><Label>Minimum (€)</Label><Input type="number" min="0" step="0.01" disabled={service.pricingMode === "FIXED"} value={service.minimumPrice ?? ""} onChange={(e) => setServices((current) => current.map((item, i) => i === index ? { ...item, minimumPrice: Number(e.target.value) || 0 } : item))} /></div>
+              <button type="button" disabled={service.code === "FULL_PROTOCOL"} className="self-center disabled:cursor-not-allowed disabled:opacity-30" aria-label={`Odstrániť ${service.name}`} onClick={() => void save(services.filter((_, i) => i !== index))}><Trash2 className="size-4 text-red-500" /></button>
+            </div>
+            <label className="mt-3 flex items-center gap-2 text-xs text-slate-600"><Checkbox checked={Boolean(service.requiresFullProtocol)} onCheckedChange={(checked) => setServices((current) => current.map((item, i) => i === index ? { ...item, requiresFullProtocol: checked === true } : item))} /> Vyžaduje kompletný protokol</label>
+          </div>
+        ))}
+      </div>
+      <Button size="sm" onClick={() => void save(services)} disabled={saving}>{saving ? "Ukladám…" : "Uložiť služby"}</Button>
+    </StepSection>
+  );
+}
+
 function LegalSection({
   settings,
   onSaved,
@@ -654,7 +789,7 @@ function LegalSection({
     onSave: async (values) => {
       try {
         await apiPatch("/api/settings", values);
-        onSaved({ ...settings, ...values });
+        onSaved({ ...settings, ...values } as SettingsResponse);
       } catch {
         toast.error("Uloženie zlyhalo");
       }

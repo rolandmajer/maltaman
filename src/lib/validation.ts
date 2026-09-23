@@ -80,6 +80,8 @@ export const conditionDeadlineSchema = z.enum([
 ]);
 export const leadStatusSchema = z.enum(["NEW", "CONTACTED", "QUALIFIED", "BOOKED", "WON", "LOST"]);
 export const leadSourceSchema = z.enum(["CHECKLIST", "WEBSITE", "REFERRAL", "MANUAL", "OTHER"]);
+export const quotationStatusSchema = z.enum(["DRAFT", "SENT", "AWAITING_SELECTION", "CLIENT_SELECTED", "ACCEPTED", "REJECTED", "EXPIRED", "CONVERTED"]);
+export const quotationPropertyTypeSchema = z.enum(["APARTMENT", "HOUSE", "OTHER", "SHELL"]);
 
 // ---------------------------------------------------------------------------
 // CRM
@@ -114,6 +116,53 @@ export const leadUpdateSchema = z.object({
   propertyType: z.string().trim().optional(),
   message: z.string().trim().optional(),
   nextActionAt: nullableDate(),
+});
+
+// ---------------------------------------------------------------------------
+// Commercial quotations (separate from repair-cost estimates)
+// ---------------------------------------------------------------------------
+
+export const quotationCreateSchema = z.object({
+  customerId: z.string().optional().nullable(),
+  leadId: z.string().optional().nullable(),
+  clientName: z.string().trim().optional(),
+  clientEmail: z.string().trim().email("Neplatný e-mail").or(z.literal("")).optional(),
+  clientPhone: z.string().trim().optional(),
+  propertyAddress: z.string().trim().optional(),
+  propertyType: quotationPropertyTypeSchema.default("APARTMENT"),
+  floorAreaM2: z.coerce.number().nonnegative().default(0),
+  floors: z.coerce.number().int().min(1).default(1),
+  complexityFactors: z.array(z.string()).default([]),
+  oneWayDistanceKm: z.coerce.number().nonnegative().default(0),
+  distanceManual: z.boolean().default(false),
+  selectedOptionalCodes: z.array(z.string()).default([]),
+  discountAmount: z.coerce.number().nonnegative().default(0),
+  pricesIncludeVat: z.boolean().default(true),
+  notes: z.string().optional(),
+});
+
+export const quotationUpdateSchema = quotationCreateSchema.partial().extend({
+  status: quotationStatusSchema.optional(),
+  routeNote: z.string().optional(),
+  terms: z.string().optional(),
+});
+
+export const quotationLineUpdateSchema = z.object({
+  selected: z.boolean().optional(),
+  quantity: z.coerce.number().nonnegative().optional(),
+  unitPrice: z.coerce.number().nonnegative().optional(),
+  name: z.string().trim().min(1).optional(),
+  description: z.string().optional(),
+});
+
+export const quoteOptionalServicePresetSchema = z.object({
+  code: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  description: z.string().default(""),
+  pricingMode: z.enum(["FIXED", "PER_M2"]),
+  price: z.coerce.number().nonnegative(),
+  minimumPrice: z.coerce.number().nonnegative().optional(),
+  requiresFullProtocol: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -456,6 +505,26 @@ export const appSettingsUpdateSchema = z.object({
   legalClientOnly: z.string().optional(),
   costCategoryPresets: z.array(z.string()).optional(),
   roomTypePresets: z.array(z.string()).optional(),
+  quoteNumberPrefix: z.string().optional(),
+  pricingBaseAddress: z.string().optional(),
+  quoteValidityDays: z.coerce.number().int().min(1).max(365).optional(),
+  apartmentRatePerM2: optionalNumber(),
+  apartmentMinimumPrice: optionalNumber(),
+  houseRatePerM2: optionalNumber(),
+  houseMinimumPrice: optionalNumber(),
+  otherRatePerM2: optionalNumber(),
+  otherMinimumPrice: optionalNumber(),
+  shellRatePerM2: optionalNumber(),
+  shellMinimumPrice: optionalNumber(),
+  fullProtocolRatePerM2: optionalNumber(),
+  fullProtocolMinimum: optionalNumber(),
+  travelFreeUpToKm: optionalNumber(),
+  travelBandTwoUpToKm: optionalNumber(),
+  travelBandTwoPrice: optionalNumber(),
+  travelBandThreeUpToKm: optionalNumber(),
+  travelBandThreePrice: optionalNumber(),
+  travelOverBandRatePerKm: optionalNumber(),
+  quoteOptionalServices: z.array(quoteOptionalServicePresetSchema).optional(),
 });
 
 // ---------------------------------------------------------------------------

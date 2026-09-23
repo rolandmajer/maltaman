@@ -62,6 +62,11 @@ test:e2e` (or wipe `prisma/dev.db` and re-migrate) if you want a clean demo data
   `src/lib/pdf/fonts.ts` for why; it fixed a real character-dropping bug around "fi"/"fl"
   ligatures). Rendered server-side in `GET /api/inspections/[id]/pdf`, streamed directly (no temp
   files).
+- **Cenové ponuky**: `/cenove-ponuky` calculates an inspection from property type, floor area,
+  complexity and return road distance from the configured Martin base. Required charges and
+  individually selectable services are kept separate; the full room-by-room protocol is an
+  optional per-m² service. Issued PDFs retain their own price snapshot and accepted quotations can
+  be converted into pre-filled inspections.
 - **PWA**: `src/app/manifest.ts` + `public/sw.js` (network-first pages with a cache fallback,
   cache-first static assets, API requests always bypass the SW so the offline-queue logic above is
   the single source of truth for offline writes). The service worker registers only in production

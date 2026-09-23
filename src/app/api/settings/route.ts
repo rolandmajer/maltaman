@@ -12,6 +12,7 @@ export async function GET() {
       ...settings,
       costCategoryPresets: JSON.parse(settings.costCategoryPresets),
       roomTypePresets: JSON.parse(settings.roomTypePresets),
+      quoteOptionalServices: JSON.parse(settings.quoteOptionalServices),
     });
   } catch (error) {
     return jsonError(error);
@@ -22,7 +23,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const user = await requireSession();
     const data = appSettingsUpdateSchema.parse(await req.json());
-    const { costCategoryPresets, roomTypePresets, ...rest } = data;
+    const { costCategoryPresets, roomTypePresets, quoteOptionalServices, ...rest } = data;
 
     const updated = await db.appSettings.update({
       where: { organisationId: user.organisationId },
@@ -30,12 +31,14 @@ export async function PATCH(req: NextRequest) {
         ...rest,
         ...(costCategoryPresets ? { costCategoryPresets: JSON.stringify(costCategoryPresets) } : {}),
         ...(roomTypePresets ? { roomTypePresets: JSON.stringify(roomTypePresets) } : {}),
+        ...(quoteOptionalServices ? { quoteOptionalServices: JSON.stringify(quoteOptionalServices) } : {}),
       },
     });
     return NextResponse.json({
       ...updated,
       costCategoryPresets: JSON.parse(updated.costCategoryPresets),
       roomTypePresets: JSON.parse(updated.roomTypePresets),
+      quoteOptionalServices: JSON.parse(updated.quoteOptionalServices),
     });
   } catch (error) {
     return jsonError(error);

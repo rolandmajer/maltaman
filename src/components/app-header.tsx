@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Settings, LogOut, Home, Users, ContactRound, ClipboardCheck } from "lucide-react";
+import { Settings, LogOut, Home, Users, ContactRound, ClipboardCheck, Calculator } from "lucide-react";
 import { signOutAction } from "@/app/actions";
 import { SyncStatusBadge } from "@/components/sync-status-badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,9 @@ export function AppHeader({ userName, backHref }: { userName: string; backHref?:
             <Link href="/crm/customers">
               <Button variant="ghost" size="sm"><Users /> Klienti</Button>
             </Link>
+            <Link href="/cenove-ponuky">
+              <Button variant="ghost" size="sm"><Calculator /> Ponuky</Button>
+            </Link>
           </nav>
         </div>
         <div className="flex min-w-0 items-center gap-2">
@@ -48,7 +51,7 @@ export function AppHeader({ userName, backHref }: { userName: string; backHref?:
           </form>
         </div>
       </div>
-      <nav className="grid grid-cols-3 border-t border-slate-100 sm:hidden" aria-label="Hlavná navigácia">
+      <nav className="grid grid-cols-4 border-t border-slate-100 sm:hidden" aria-label="Hlavná navigácia">
         <Link href="/" className="flex items-center justify-center gap-1.5 py-2 text-xs text-slate-600">
           <ClipboardCheck className="size-4" /> Obhliadky
         </Link>
@@ -57,6 +60,9 @@ export function AppHeader({ userName, backHref }: { userName: string; backHref?:
         </Link>
         <Link href="/crm/customers" className="flex items-center justify-center gap-1.5 py-2 text-xs text-slate-600">
           <Users className="size-4" /> Klienti
+        </Link>
+        <Link href="/cenove-ponuky" className="flex items-center justify-center gap-1.5 py-2 text-xs text-slate-600">
+          <Calculator className="size-4" /> Ponuky
         </Link>
       </nav>
       <div className="border-t border-slate-100 px-4 py-1.5 sm:hidden">

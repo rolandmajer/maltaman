@@ -29,6 +29,15 @@ export async function requireInspectionAccess(inspectionId: string, organisation
   return inspection;
 }
 
+/** Loads a quotation and verifies organisation ownership. */
+export async function requireQuotationAccess(quotationId: string, organisationId: string) {
+  const quotation = await db.quotation.findUnique({ where: { id: quotationId } });
+  if (!quotation || quotation.organisationId !== organisationId) {
+    throw new ApiError(404, "Cenová ponuka nebola nájdená");
+  }
+  return quotation;
+}
+
 export function jsonError(error: unknown): NextResponse {
   if (error instanceof ApiError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
