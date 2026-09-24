@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Calculator, Mail, MapPin, Phone, Plus, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -64,6 +64,20 @@ export function LeadsClient({ initialLeads }: { initialLeads: LeadDto[] }) {
   const [filter, setFilter] = useState<LeadStatus | "ALL">("ALL");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", propertyAddress: "" });
+
+  useEffect(() => {
+    setLeads(initialLeads);
+  }, [initialLeads]);
+
+  useEffect(() => {
+    const refresh = () => router.refresh();
+    const interval = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [router]);
 
   const visible = useMemo(
     () => leads.filter((lead) => filter === "ALL" || lead.status === filter),
