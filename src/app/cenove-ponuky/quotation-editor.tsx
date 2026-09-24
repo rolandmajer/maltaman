@@ -183,7 +183,7 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
       const saved = quotationId ? await apiPatch<QuoteResponse>(`/api/quotations/${quotationId}`, body) : await apiPost<QuoteResponse>("/api/quotations", body, "Vytvorenie cenovej ponuky");
       setQuote({ ...saved, complexityFactors: Array.isArray(saved.complexityFactors) ? saved.complexityFactors : JSON.parse(saved.complexityFactors || "[]") });
       toast.success("Cenová ponuka bola uložená");
-      if (!quotationId) router.replace(`/cenove-ponuky/${saved.id}`);
+      router.push("/cenove-ponuky");
       router.refresh();
       return saved;
     } catch (error) { toast.error(error instanceof Error ? error.message : "Uloženie zlyhalo"); return null; }
@@ -342,7 +342,7 @@ export function QuotationEditor({ quotationId }: { quotationId?: string }) {
       </fieldset>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 backdrop-blur"><div className="mx-auto flex max-w-5xl flex-wrap justify-end gap-2">
-        {!locked && <Button variant="outline" onClick={() => void save()} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />} Uložiť</Button>}
+        {!locked && <Button variant="outline" onClick={() => void save()} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />} Uložiť a zavrieť</Button>}
         {!locked && <Button variant="outline" onClick={() => void prepareClientForm()} disabled={saving}><Mail /> Formulár klientovi</Button>}
         {quote && ["DRAFT", "CLIENT_SELECTED"].includes(quote.status) && <Button variant="outline" onClick={() => void setStatus("SENT")} disabled={saving}><Send /> Odoslať cenovú ponuku</Button>}
         {quote && !["ACCEPTED", "CONVERTED"].includes(quote.status) && <Button onClick={() => void setStatus("ACCEPTED")} disabled={saving}><Check /> Klient prijal</Button>}

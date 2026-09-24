@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Settings, LogOut, Home, Users, ContactRound, ClipboardCheck, Calculator } from "lucide-react";
+import { Settings, LogOut, Home, Users, ContactRound, ClipboardCheck, Calculator, RefreshCw } from "lucide-react";
 import { signOutAction } from "@/app/actions";
 import { SyncStatusBadge } from "@/components/sync-status-badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,9 @@ export function AppHeader({ userName, backHref }: { userName: string; backHref?:
         <div className="flex min-w-0 items-center gap-2">
           <SyncStatusBadge className="hidden sm:inline-flex" />
           <span className="hidden truncate text-sm text-slate-500 md:inline">{userName}</span>
+          <Button variant="ghost" size="icon" type="button" aria-label="Obnoviť aplikáciu" title="Obnoviť aplikáciu" onClick={() => window.location.reload()}>
+            <RefreshCw className="size-5" />
+          </Button>
           <Link href="/nastavenia">
             <Button variant="ghost" size="icon" aria-label="Nastavenia">
               <Settings className="size-5" />
