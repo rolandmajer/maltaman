@@ -5,7 +5,7 @@ export const websiteIntakeSchema = z.object({
   intakeId: z.string().trim().min(8).max(100),
   name: z.string().trim().min(2, "Zadajte meno a priezvisko").max(150),
   email: z.string().trim().email("Zadajte platný e-mail").max(200),
-  phone: z.string().trim().min(6, "Zadajte telefónne číslo").max(50),
+  phone: z.string().trim().min(4, "Zadajte telefónne číslo").max(50),
   service: z.enum(["byt", "dom", "novostavba", "rekonstrukcia", "kontrola_ponuky"]),
   location: z.string().trim().min(2, "Zadajte lokalitu nehnuteľnosti").max(300),
   floorAreaM2: z.coerce.number().nonnegative().max(10000).default(0),
